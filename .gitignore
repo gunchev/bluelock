@@ -1,6 +1,7 @@
-/dist/
 /build/
+/dist/
 /htmlcov/
+/screenshots/
 __pycache__/
 *.py[cod]
 *.egg-info/

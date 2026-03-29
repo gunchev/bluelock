@@ -1,0 +1,21 @@
+[tool.ruff]
+line-length = 120
+# Enable pycodestyle (E, W), Pyflakes (F), and isort (I)
+select = ["E", "W", "F", "I"]
+# Disable rules that are too restrictive compared to autopep8
+ignore = [
+    "E501", # Ignore line length violations (autopep8 handles this differently)
+    "E111", # Indentation is not a multiple of four
+    "E114", # Indentation is not a multiple of four (comment)
+    "E701", # Multiple statements on one line (colon)
+]
+
+[tool.ruff.format]
+# Use spaces for indentation
+indent-style = "space"
+# Ensure we are not using Black's quote style if not desired
+quote-style = "double"
+
+[tool.ruff.lint.isort]
+# Ensure imports are sorted
+order-by-type = true
