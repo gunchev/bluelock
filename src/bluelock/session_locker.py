@@ -112,3 +112,59 @@ class SessionLocker:
             detail = f": {result.stderr.strip()}" if result.stderr.strip() else ""
             raise LockError(f"{action.capitalize()} command exited {result.returncode}{detail}")
         log.info("Session %sed via command: %s", action, command)
+
+
+class ScreenSaverInhibitor:
+    """Prevents the screensaver / idle-lock while a Bluetooth device is nearby.
+
+    Calls org.freedesktop.ScreenSaver.Inhibit on the session bus and holds the
+    returned cookie until uninhibit() is called.  Safe to call multiple times.
+    """
+
+    _APP_NAME = "BlueLock"
+    _REASON = "Bluetooth device is nearby"
+
+    def __init__(self) -> None:
+        self._cookie: int | None = None
+
+    @property
+    def active(self) -> bool:
+        return self._cookie is not None
+
+    def inhibit(self) -> None:
+        """Acquire an inhibit lock (no-op if already held)."""
+        if self._cookie is not None:
+            return
+        try:
+            from PyQt6.QtDBus import QDBusConnection, QDBusMessage
+            bus = QDBusConnection.sessionBus()
+            msg = QDBusMessage.createMethodCall(_SS_SVC, _SS_PATH, _SS_SVC, "Inhibit")
+            msg.setArguments([self._APP_NAME, self._REASON])
+            reply = bus.call(msg)
+            if reply.type() == QDBusMessage.MessageType.ErrorMessage:
+                log.warning("ScreenSaver.Inhibit failed: %s", reply.errorMessage())
+                return
+            args = reply.arguments()
+            self._cookie = int(args[0]) if args else None
+            log.info("Screensaver inhibited (cookie=%s)", self._cookie)
+        except Exception as exc:  # noqa: BLE001
+            log.warning("ScreenSaver.Inhibit error: %s", exc)
+
+    def uninhibit(self) -> None:
+        """Release the inhibit lock (no-op if not held)."""
+        if self._cookie is None:
+            return
+        try:
+            from PyQt6.QtDBus import QDBusConnection, QDBusMessage
+            bus = QDBusConnection.sessionBus()
+            msg = QDBusMessage.createMethodCall(_SS_SVC, _SS_PATH, _SS_SVC, "UnInhibit")
+            msg.setArguments([self._cookie])
+            reply = bus.call(msg)
+            if reply.type() == QDBusMessage.MessageType.ErrorMessage:
+                log.warning("ScreenSaver.UnInhibit failed: %s", reply.errorMessage())
+            else:
+                log.info("Screensaver uninhibited (cookie=%s)", self._cookie)
+        except Exception as exc:  # noqa: BLE001
+            log.warning("ScreenSaver.UnInhibit error: %s", exc)
+        finally:
+            self._cookie = None

@@ -199,3 +199,15 @@ In the options, "Settings" tab, add a checkbox to auto-start on login. Make the 
 ## Prompt 34
 
 Make release 0.1.0, update PROMPT.md, commit.
+
+## Prompt 35
+
+`make rpm` ends with `install: cannot stat '/home/dgunchev/rpmbuild/SOURCES/bluelock-sudoers': No such file or directory`.
+
+## Prompt 36
+
+When the monitored device is near how can we prevent KDE from locking the screen?
+
+## Prompt 37
+
+Update the PROMPT.md and commit. Tag new minor release.
