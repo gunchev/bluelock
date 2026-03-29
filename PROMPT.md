@@ -160,3 +160,34 @@ Make the config window 20% taller and commit the changes so far.
 ## Prompt 25
 
 Update PROMPT.md for me please, with all prompts. Mask the MAC addresses with 'XX:XX:XX:XX:XX:XX'.
+
+## Prompt 26
+
+If the device is configured make the config window open the settings tab instead of the device tab.
+
+## Prompt 27
+
+The red icon does not persist - shows up only when opening the configuration dialog. What do the different color
+icons show?
+
+## Prompt 28
+
+Use the `bluelock_far.svg` to show when the device is far and lock is pending/active. Use `bluelock_gone.svg` when
+the device is absent only. Document these in the README.md file.
+
+## Prompt 29
+
+The app does not seem to lock/unlock. The icon is most of the time gray, sometimes blinks red.
+
+## Prompt 30
+
+Locking works, unlocking however prints the log message but nothing happens. I have to unlock by hand.
+
+## Prompt 31
+
+`ERROR bluelock.app: Unlock failed: Cannot find login1 session: Invalid arguments 'i' to call
+org.freedesktop.login1.Manager.GetSessionByPID(), expecting 'u'.`
+
+## Prompt 32
+
+Seems to work. Please update the PROMPT.md and commit the changes.

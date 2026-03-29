@@ -51,6 +51,8 @@ class ConfigDialog(QDialog):
 
         self._build_ui()
         self._populate(config)
+        if config.device_mac:
+            self._tabs.setCurrentIndex(1)
 
     # ------------------------------------------------------------------ #
     # Public                                                               #

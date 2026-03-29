@@ -48,6 +48,11 @@ class ProximityStateMachine:
     def state(self) -> ProximityState:
         return self._state
 
+    @property
+    def lock_pending(self) -> bool:
+        """True while in ACTIVE state and the lock duration counter is running."""
+        return self._state == ProximityState.ACTIVE and self._duration_counter > 0
+
     def evaluate(
         self, smoothed_rssi: float, device_present: bool
     ) -> ProximityState | None:

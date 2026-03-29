@@ -8,7 +8,7 @@ session is unlocked.
 
 ## Features
 
-- System tray icon with five states: close, far, gone, error, paused
+- System tray icon with five states reflecting proximity and lock status
 - Configurable RSSI thresholds with hysteresis (separate lock/unlock levels)
 - Configurable time durations before acting (avoids triggering on momentary drops)
 - D-Bus `org.freedesktop.ScreenSaver` for lock/unlock — no extra tools required
@@ -49,17 +49,27 @@ sudo rpm -i ~/rpmbuild/RPMS/noarch/bluelock-*.rpm
 1. Launch BlueLock — it appears in the system tray.
 2. Right-click the tray icon and choose **Preferences**.
 3. Click **Scan** to find nearby Bluetooth devices.
-4. Select your device and click **Use Selected**.
+4. Select your device and click **Use**.
 5. Adjust the lock/unlock RSSI thresholds and durations to taste.
 6. Click **OK** — monitoring begins immediately.
 
+### Tray icon states
+
+| Icon                   | Meaning                                         |
+|------------------------|-------------------------------------------------|
+| **Close** (blue)       | Device is nearby — session is unlocked          |
+| **Far** (yellow/amber) | Device is moving away — lock countdown active   |
+| **Gone** (red)         | Device is absent — session is locked            |
+| **Error** (grey)       | Initialising, or no signal yet                  |
+| **Paused**             | Monitoring is paused — no automatic lock/unlock |
+
 ### Thresholds
 
-| Setting | Description |
-|---------|-------------|
-| Lock RSSI | Session locks when signal drops **below** this level |
-| Lock duration | Signal must stay below the threshold for this many seconds before locking |
-| Unlock RSSI | Session unlocks when signal rises **above** this level |
+| Setting         | Description                                                                 |
+|-----------------|-----------------------------------------------------------------------------|
+| Lock RSSI       | Session locks when signal drops **below** this level                        |
+| Lock duration   | Signal must stay below the threshold for this many seconds before locking   |
+| Unlock RSSI     | Session unlocks when signal rises **above** this level                      |
 | Unlock duration | Signal must stay above the threshold for this many seconds before unlocking |
 
 The gap between the lock and unlock thresholds acts as a hysteresis band,

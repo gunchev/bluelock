@@ -61,14 +61,14 @@ class TrayIcon(QObject):
     # ------------------------------------------------------------------ #
 
     def update(self, state: ProximityState, rssi: float, distance_m: float,
-               device_name: str, paused: bool) -> None:
+               device_name: str, paused: bool, lock_pending: bool = False) -> None:
         """Update the icon and tooltip to reflect the current state."""
         self._paused = paused
         self._pause_action.setChecked(paused)
 
-        icon_key = self._icon_key(state, paused)
+        icon_key = self._icon_key(state, paused, lock_pending)
         self._tray.setIcon(self._icons[icon_key])
-        self._tray.setToolTip(self._build_tooltip(state, rssi, distance_m, device_name, paused))
+        self._tray.setToolTip(self._build_tooltip(state, rssi, distance_m, device_name, paused, lock_pending))
 
     def show_error(self, message: str) -> None:
         """Display error icon and message in tooltip."""
@@ -116,26 +116,28 @@ class TrayIcon(QObject):
         dlg.exec()
 
     @staticmethod
-    def _icon_key(state: ProximityState, paused: bool) -> str:
+    def _icon_key(state: ProximityState, paused: bool, lock_pending: bool = False) -> str:
         if paused:
             return "paused"
+        if state == ProximityState.ACTIVE:
+            return "far" if lock_pending else "close"
         return {
-            ProximityState.ACTIVE:  "close",
             ProximityState.GONE:    "gone",
             ProximityState.UNKNOWN: "error",
         }.get(state, "error")
 
     @staticmethod
     def _build_tooltip(state: ProximityState, rssi: float, distance_m: float,
-                       device_name: str, paused: bool) -> str:
+                       device_name: str, paused: bool, lock_pending: bool = False) -> str:
         label = device_name or "No device"
         if paused:
             return f"BlueLock — Paused\n{label}"
-        state_str = {
-            ProximityState.ACTIVE:  "Unlocked",
-            ProximityState.GONE:    "Locked",
-            ProximityState.UNKNOWN: "Initialising…",
-        }.get(state, "Unknown")
+        if state == ProximityState.ACTIVE:
+            state_str = "Locking soon…" if lock_pending else "Unlocked"
+        elif state == ProximityState.GONE:
+            state_str = "Locked"
+        else:
+            state_str = "Initialising…"
         rssi_str = f"{rssi:.0f} dBm" if rssi > -127 else "—"
         dist_str = f"{distance_m:.1f} m" if distance_m < 999 else "out of range"
         return f"BlueLock — {state_str}\n{label}\nRSSI: {rssi_str}  Distance: ≈{dist_str}"

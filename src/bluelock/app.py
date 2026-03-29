@@ -101,7 +101,8 @@ class BlueLockApp:
 
         self._tray.update(self._machine.state, self._processor.smoothed_rssi,
                           self._processor.estimated_distance_m,
-                          self._config.device_name, paused=False)
+                          self._config.device_name, paused=False,
+                          lock_pending=self._machine.lock_pending)
 
     def _do_lock(self) -> None:
         try:

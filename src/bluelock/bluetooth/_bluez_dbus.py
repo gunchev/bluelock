@@ -43,6 +43,7 @@ class BluezDBusMonitor(AbstractBluetoothMonitor):
         self._monitoring = False
         self._scanning = False
         self._last_rssi_time = 0.0
+        self._poll_reachable = False   # True when btmgmt/hcitool last succeeded
 
         # Timer for hcitool RSSI polling (classic BT devices don't emit RSSI via PropertiesChanged)
         self._stale_timer = QTimer(self)
@@ -75,6 +76,7 @@ class BluezDBusMonitor(AbstractBluetoothMonitor):
         self._target_path = mac_to_dbus_path(self._adapter_path, mac)
         self._monitoring = True
         self._last_rssi_time = 0.0
+        self._poll_reachable = False
         log.info("Starting monitoring for %s (%s)", mac, self._target_path)
 
         self._connect_object_manager_signals()
@@ -92,6 +94,7 @@ class BluezDBusMonitor(AbstractBluetoothMonitor):
         self._disconnect_device_signals(self._target_path)
         self._disconnect_object_manager_signals()
         self._monitoring = False
+        self._poll_reachable = False
         self._target_mac = ""
         self._target_path = ""
 
@@ -189,6 +192,15 @@ class BluezDBusMonitor(AbstractBluetoothMonitor):
             log.debug("RSSI update from D-Bus: %d dBm", rssi)
             self._last_rssi_time = time.monotonic()
             self.rssi_updated.emit(int(rssi))
+        if "Connected" in changed:
+            connected = bool(changed["Connected"])
+            log.info("Device %s: Connected=%s", self._target_mac, connected)
+            if connected:
+                self._poll_reachable = True
+                self.device_appeared.emit()
+            else:
+                self._poll_reachable = False
+                self.device_disappeared.emit()
 
     @pyqtSlot('QDBusMessage')
     def _on_interfaces_added(self, msg: QDBusMessage) -> None:
@@ -237,14 +249,23 @@ class BluezDBusMonitor(AbstractBluetoothMonitor):
     # ------------------------------------------------------------------ #
 
     def _on_stale_check(self) -> None:
-        """Poll RSSI via hcitool — used for classic BT devices that don't emit PropertiesChanged RSSI."""
+        """Poll RSSI and track device reachability for classic BT devices."""
         if not self._monitoring or not self._target_mac:
             return
         rssi = _btmgmt_rssi(self._target_mac) or _hcitool_rssi(self._target_mac)
         if rssi is not None:
-            log.debug("RSSI from hcitool: %d dBm", rssi)
+            log.debug("RSSI from poll: %d dBm", rssi)
             self._last_rssi_time = time.monotonic()
             self.rssi_updated.emit(rssi)
+            if not self._poll_reachable:
+                self._poll_reachable = True
+                log.info("Device reachable (poll): %s", self._target_mac)
+                self.device_appeared.emit()
+        else:
+            if self._poll_reachable:
+                self._poll_reachable = False
+                log.info("Device unreachable (poll): %s", self._target_mac)
+                self.device_disappeared.emit()
 
     # ------------------------------------------------------------------ #
     # Utility: enumerate currently known devices from BlueZ                #

@@ -63,16 +63,28 @@ class SessionLocker:
             raise LockError("PyQt6.QtDBus not available") from exc
 
     def _dbus_unlock(self) -> None:
-        """Unlock via D-Bus org.freedesktop.ScreenSaver.SetActive(false)."""
+        """Unlock via org.freedesktop.login1.Session.Unlock() on the system bus.
+
+        SetActive(false) on org.freedesktop.ScreenSaver only dismisses the
+        screensaver, not a password-locked session.  login1 Session.Unlock()
+        is what 'loginctl unlock-session' uses and works on KDE/GNOME/etc.
+
+        The session path is built from $XDG_SESSION_ID (always set on a desktop
+        session) to avoid a GetSessionByPID D-Bus call with tricky uint32 typing.
+        """
+        import os
         try:
             from PyQt6.QtDBus import QDBusConnection, QDBusMessage
-            bus = QDBusConnection.sessionBus()
-            msg = QDBusMessage.createMethodCall(_SS_SVC, _SS_PATH, _SS_SVC, "SetActive")
-            msg.setArguments([False])
+            session_id = os.environ.get("XDG_SESSION_ID", "auto")
+            session_path = f"/org/freedesktop/login1/session/{session_id}"
+            bus = QDBusConnection.systemBus()
+            msg = QDBusMessage.createMethodCall(
+                "org.freedesktop.login1", session_path,
+                "org.freedesktop.login1.Session", "Unlock")
             reply = bus.call(msg)
             if reply.type() == QDBusMessage.MessageType.ErrorMessage:
                 raise LockError(f"D-Bus unlock failed: {reply.errorMessage()}")
-            log.info("Session unlocked via D-Bus")
+            log.info("Session unlocked via login1 D-Bus (%s)", session_path)
         except ImportError as exc:
             raise LockError("PyQt6.QtDBus not available") from exc
 
