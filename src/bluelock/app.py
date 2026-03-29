@@ -179,11 +179,20 @@ class BlueLockApp:
 
 def main() -> None:
     """Application entry point."""
+    import signal
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 
     app = QApplication(sys.argv)
     app.setApplicationName("BlueLock")
     app.setQuitOnLastWindowClosed(False)   # keep running after dialogs close
+
+    # Qt's C++ event loop never yields to Python, so SIGINT would be ignored.
+    # Install a handler that calls quit(), and a timer that wakes Python periodically
+    # so the signal is actually delivered.
+    signal.signal(signal.SIGINT, lambda *_: app.quit())
+    sig_timer = QTimer()
+    sig_timer.start(200)
+    sig_timer.timeout.connect(lambda: None)
 
     bluelock = BlueLockApp(app)
     bluelock.start()
