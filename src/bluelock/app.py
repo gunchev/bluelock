@@ -51,7 +51,7 @@ class BlueLockApp:
             self._eval_timer.start()
         else:
             log.info("No device configured — opening preferences")
-            self._show_preferences()
+            QTimer.singleShot(0, self._show_preferences)
 
     def _wire_signals(self) -> None:
         self._monitor.rssi_updated.connect(self._on_rssi_updated)
