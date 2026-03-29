@@ -2,9 +2,11 @@
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import (
+    QCheckBox,
     QDialog,
     QDialogButtonBox,
     QDoubleSpinBox,
@@ -28,6 +30,29 @@ from PyQt6.QtWidgets import (
 )
 
 from bluelock.bluetooth._types import DeviceInfo
+
+_AUTOSTART_FILE = Path.home() / ".config" / "autostart" / "bluelock.desktop"
+_AUTOSTART_CONTENT = """\
+[Desktop Entry]
+Type=Application
+Name=BlueLock
+Exec=bluelock
+Icon=bluelock
+Comment=Lock and unlock your session based on Bluetooth proximity
+X-GNOME-Autostart-enabled=true
+"""
+
+
+def _autostart_enabled() -> bool:
+    return _AUTOSTART_FILE.exists()
+
+
+def _set_autostart(enabled: bool) -> None:
+    if enabled:
+        _AUTOSTART_FILE.parent.mkdir(parents=True, exist_ok=True)
+        _AUTOSTART_FILE.write_text(_AUTOSTART_CONTENT)
+    elif _AUTOSTART_FILE.exists():
+        _AUTOSTART_FILE.unlink()
 from bluelock.config import Config
 from bluelock.signal_processor import estimate_distance_m
 
@@ -43,7 +68,7 @@ class ConfigDialog(QDialog):
     def __init__(self, config: Config, parent=None) -> None:
         super().__init__(parent)
         self.setWindowTitle("BlueLock — Preferences")
-        self.setMinimumSize(720, 600)
+        self.setMinimumSize(720, 690)
 
         self._config = config
         self._monitor = None
@@ -103,7 +128,7 @@ class ConfigDialog(QDialog):
         layout.addWidget(self._tabs)
 
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
-        buttons.accepted.connect(self.accept)
+        buttons.accepted.connect(self._on_accept)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
 
@@ -243,6 +268,10 @@ class ConfigDialog(QDialog):
         self._interval_spin.setToolTip("How often to evaluate the lock/unlock state")
         form.addRow("Scan interval:", self._interval_spin)
 
+        self._autostart_check = QCheckBox("Start BlueLock automatically on login")
+        self._autostart_check.setChecked(_autostart_enabled())
+        form.addRow("Auto-start:", self._autostart_check)
+
         return box
 
     # ------------------------------------------------------------------ #
@@ -299,6 +328,13 @@ class ConfigDialog(QDialog):
 
     def _on_scan_finished(self) -> None:
         self._on_scan_done()
+
+    def _on_accept(self) -> None:
+        try:
+            _set_autostart(self._autostart_check.isChecked())
+        except OSError as e:
+            log.warning("Could not update autostart entry: %s", e)
+        self.accept()
 
     def _on_device_selected(self) -> None:
         row = self._device_table.currentRow()

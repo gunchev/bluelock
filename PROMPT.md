@@ -191,3 +191,11 @@ org.freedesktop.login1.Manager.GetSessionByPID(), expecting 'u'.`
 ## Prompt 32
 
 Seems to work. Please update the PROMPT.md and commit the changes.
+
+## Prompt 33
+
+In the options, "Settings" tab, add a checkbox to auto-start on login. Make the dialog 15% taller to fit everything.
+
+## Prompt 34
+
+Make release 0.1.0, update PROMPT.md, commit.
