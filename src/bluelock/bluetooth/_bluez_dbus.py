@@ -20,8 +20,8 @@ _DBUS_OBJMGR_IFACE = "org.freedesktop.DBus.ObjectManager"
 _DBUS_PROPS_IFACE = "org.freedesktop.DBus.Properties"
 _DEFAULT_ADAPTER = "/org/bluez/hci0"
 
-# If no RSSI update arrives within this many milliseconds, try hcitool fallback
-_RSSI_STALE_MS = 5_000
+# Poll interval for hcitool RSSI fallback (classic BT devices don't emit PropertiesChanged RSSI)
+_RSSI_POLL_MS = 2_000
 
 
 class BluezDBusMonitor(AbstractBluetoothMonitor):
@@ -44,9 +44,9 @@ class BluezDBusMonitor(AbstractBluetoothMonitor):
         self._scanning = False
         self._last_rssi_time = 0.0
 
-        # Timer for hcitool fallback when D-Bus RSSI goes stale
+        # Timer for hcitool RSSI polling (classic BT devices don't emit RSSI via PropertiesChanged)
         self._stale_timer = QTimer(self)
-        self._stale_timer.setInterval(_RSSI_STALE_MS)
+        self._stale_timer.setInterval(_RSSI_POLL_MS)
         self._stale_timer.timeout.connect(self._on_stale_check)
 
         # Timer to end a scan automatically
@@ -104,6 +104,9 @@ class BluezDBusMonitor(AbstractBluetoothMonitor):
         self._connect_object_manager_signals()
         self._start_discovery()
         self._scan_timer.start(timeout_ms)
+        # Emit already-known devices immediately; InterfacesAdded won't fire for them
+        for device in self.get_known_devices():
+            self.scan_result.emit(device)
 
     def stop_scan(self) -> None:
         """Stop an in-progress scan."""
@@ -130,24 +133,21 @@ class BluezDBusMonitor(AbstractBluetoothMonitor):
     # ------------------------------------------------------------------ #
 
     def _connect_object_manager_signals(self) -> None:
-        self._bus.connect(_BLUEZ_SVC, "/", _DBUS_OBJMGR_IFACE, "InterfacesAdded",
-                          "oa{sa{sv}}", self._on_interfaces_added)
-        self._bus.connect(_BLUEZ_SVC, "/", _DBUS_OBJMGR_IFACE, "InterfacesRemoved",
-                          "oas", self._on_interfaces_removed)
+        ok1 = self._bus.connect(_BLUEZ_SVC, "/", _DBUS_OBJMGR_IFACE, "InterfacesAdded", self._on_interfaces_added)
+        ok2 = self._bus.connect(_BLUEZ_SVC, "/", _DBUS_OBJMGR_IFACE, "InterfacesRemoved", self._on_interfaces_removed)
+        log.debug("ObjectManager signals connected: added=%s removed=%s", ok1, ok2)
 
     def _disconnect_object_manager_signals(self) -> None:
-        self._bus.disconnect(_BLUEZ_SVC, "/", _DBUS_OBJMGR_IFACE, "InterfacesAdded",
-                             "oa{sa{sv}}", self._on_interfaces_added)
-        self._bus.disconnect(_BLUEZ_SVC, "/", _DBUS_OBJMGR_IFACE, "InterfacesRemoved",
-                             "oas", self._on_interfaces_removed)
+        self._bus.disconnect(_BLUEZ_SVC, "/", _DBUS_OBJMGR_IFACE, "InterfacesAdded", self._on_interfaces_added)
+        self._bus.disconnect(_BLUEZ_SVC, "/", _DBUS_OBJMGR_IFACE, "InterfacesRemoved", self._on_interfaces_removed)
 
     def _connect_device_signals(self, path: str) -> None:
-        self._bus.connect(_BLUEZ_SVC, path, _DBUS_PROPS_IFACE, "PropertiesChanged",
-                          "sa{sv}as", self._on_properties_changed)
+        ok = self._bus.connect(_BLUEZ_SVC, path, _DBUS_PROPS_IFACE, "PropertiesChanged", self._on_properties_changed)
+        if not ok:
+            log.warning("Failed to connect PropertiesChanged for %s: %s", path, self._bus.lastError().message())
 
     def _disconnect_device_signals(self, path: str) -> None:
-        self._bus.disconnect(_BLUEZ_SVC, path, _DBUS_PROPS_IFACE, "PropertiesChanged",
-                             "sa{sv}as", self._on_properties_changed)
+        self._bus.disconnect(_BLUEZ_SVC, path, _DBUS_PROPS_IFACE, "PropertiesChanged", self._on_properties_changed)
 
     # ------------------------------------------------------------------ #
     # BlueZ adapter control                                                #
@@ -172,20 +172,32 @@ class BluezDBusMonitor(AbstractBluetoothMonitor):
     # D-Bus signal handlers                                                #
     # ------------------------------------------------------------------ #
 
-    @pyqtSlot(str, dict, list)
-    def _on_properties_changed(self, interface: str, changed: dict, invalidated: list) -> None:
+    @pyqtSlot('QDBusMessage')
+    def _on_properties_changed(self, msg: QDBusMessage) -> None:
         """Handle PropertiesChanged on a BlueZ device object."""
-        if interface != _BLUEZ_DEVICE_IFACE:
+        args = msg.arguments()
+        if not args:
             return
+        iface = str(args[0])
+        log.debug("PropertiesChanged iface=%s keys=%s", iface,
+                  list(args[1].keys()) if len(args) > 1 and isinstance(args[1], dict) else args[1:])
+        if iface != _BLUEZ_DEVICE_IFACE:
+            return
+        changed = args[1] if len(args) > 1 else {}
         if "RSSI" in changed:
             rssi = changed["RSSI"]
             log.debug("RSSI update from D-Bus: %d dBm", rssi)
             self._last_rssi_time = time.monotonic()
             self.rssi_updated.emit(int(rssi))
 
-    @pyqtSlot(str, dict)
-    def _on_interfaces_added(self, path: str, interfaces: dict) -> None:
+    @pyqtSlot('QDBusMessage')
+    def _on_interfaces_added(self, msg: QDBusMessage) -> None:
         """Handle a new BlueZ object appearing (device found during scan)."""
+        args = msg.arguments()
+        if len(args) < 2:
+            return
+        path = str(args[0])
+        interfaces = args[1]
         if _BLUEZ_DEVICE_IFACE not in interfaces:
             return
         props = interfaces[_BLUEZ_DEVICE_IFACE]
@@ -206,9 +218,14 @@ class BluezDBusMonitor(AbstractBluetoothMonitor):
                 self._last_rssi_time = time.monotonic()
                 self.rssi_updated.emit(int(rssi))
 
-    @pyqtSlot(str, list)
-    def _on_interfaces_removed(self, path: str, interfaces: list) -> None:
+    @pyqtSlot('QDBusMessage')
+    def _on_interfaces_removed(self, msg: QDBusMessage) -> None:
         """Handle a BlueZ object disappearing (device went out of range)."""
+        args = msg.arguments()
+        if len(args) < 2:
+            return
+        path = str(args[0])
+        interfaces = args[1]
         if _BLUEZ_DEVICE_IFACE not in interfaces:
             return
         if self._monitoring and path == self._target_path:
@@ -220,16 +237,14 @@ class BluezDBusMonitor(AbstractBluetoothMonitor):
     # ------------------------------------------------------------------ #
 
     def _on_stale_check(self) -> None:
-        """Called periodically; if D-Bus RSSI is stale, try hcitool."""
+        """Poll RSSI via hcitool — used for classic BT devices that don't emit PropertiesChanged RSSI."""
         if not self._monitoring or not self._target_mac:
             return
-        age = time.monotonic() - self._last_rssi_time
-        if self._last_rssi_time == 0.0 or age > _RSSI_STALE_MS / 1000:
-            rssi = _hcitool_rssi(self._target_mac)
-            if rssi is not None:
-                log.debug("RSSI from hcitool fallback: %d dBm", rssi)
-                self._last_rssi_time = time.monotonic()
-                self.rssi_updated.emit(rssi)
+        rssi = _btmgmt_rssi(self._target_mac) or _hcitool_rssi(self._target_mac)
+        if rssi is not None:
+            log.debug("RSSI from hcitool: %d dBm", rssi)
+            self._last_rssi_time = time.monotonic()
+            self.rssi_updated.emit(rssi)
 
     # ------------------------------------------------------------------ #
     # Utility: enumerate currently known devices from BlueZ                #
@@ -259,23 +274,45 @@ class BluezDBusMonitor(AbstractBluetoothMonitor):
         return devices
 
 
-def _hcitool_rssi(mac: str) -> int | None:
-    """Read RSSI for a connected classic BT device via hcitool.
+def _btmgmt_rssi(mac: str) -> int | None:
+    """Read live RSSI via 'btmgmt conn-info' (requires CAP_NET_ADMIN / bluetooth group / sudo).
 
-    Returns the RSSI value (dBm) or None on failure.
-    This only works for devices with an active connection.
+    Output: "hci0 Get Conn Info Complete, status 0x00 rssi -10 tx_power 0 ..."
+    """
+    try:
+        result = subprocess.run(["sudo", "-n", "btmgmt", "conn-info", mac, "BR/EDR"],
+                                capture_output=True, text=True, timeout=5)
+        if result.returncode == 0:
+            parts = result.stdout.split()
+            for i, part in enumerate(parts):
+                if part == "rssi" and i + 1 < len(parts):
+                    try:
+                        val = int(parts[i + 1])
+                        if -120 <= val <= 20:
+                            return val
+                    except ValueError:
+                        pass
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+        pass
+    return None
+
+
+def _hcitool_rssi(mac: str) -> int | None:
+    """Read live RSSI via 'hcitool rssi' (deprecated, part of bluez-deprecated).
+
+    Fallback when btmgmt is unavailable or lacks permissions.
+    Output: "RSSI return value: -10"
     """
     try:
         result = subprocess.run(["hcitool", "rssi", mac], capture_output=True, text=True, timeout=3)
         if result.returncode == 0:
-            # Output: "RSSI return value: -42"
             for part in result.stdout.split():
                 try:
                     val = int(part)
-                    if -120 <= val <= 0:
+                    if -120 <= val <= 20:
                         return val
                 except ValueError:
-                    continue
+                    pass
     except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
         pass
     return None

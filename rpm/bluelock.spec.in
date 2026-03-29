@@ -8,6 +8,7 @@ URL:            https://github.com/gunchev/bluelock
 Source0:        %{name}-%{version}.tar.gz
 Source1:        %{name}.desktop
 Source2:        %{name}.svg
+Source3:        %{name}-sudoers
 
 BuildArch:      noarch
 BuildRequires:  python3-devel
@@ -17,6 +18,7 @@ BuildRequires:  desktop-file-utils
 Requires:       python3
 Requires:       python3-pyqt6-base
 Requires:       bluez
+Requires:       sudo
 
 %description
 BlueLock monitors a paired Bluetooth device's signal strength and automatically
@@ -42,6 +44,7 @@ Features:
 
 install -Dpm 0644 %{SOURCE1} %{buildroot}%{_datadir}/applications/%{name}.desktop
 install -Dpm 0644 %{SOURCE2} %{buildroot}%{_datadir}/icons/hicolor/scalable/apps/%{name}.svg
+install -Dpm 0440 %{SOURCE3} %{buildroot}%{_sysconfdir}/sudoers.d/%{name}
 
 %check
 desktop-file-validate %{buildroot}%{_datadir}/applications/%{name}.desktop
@@ -49,7 +52,9 @@ desktop-file-validate %{buildroot}%{_datadir}/applications/%{name}.desktop
 %files -f %{pyproject_files}
 %license LICENSE
 %{_bindir}/%{name}
+%{_bindir}/%{name}_mon
 %{_datadir}/applications/%{name}.desktop
 %{_datadir}/icons/hicolor/scalable/apps/%{name}.svg
+%config(noreplace) %{_sysconfdir}/sudoers.d/%{name}
 
 %changelog

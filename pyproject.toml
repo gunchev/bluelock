@@ -45,6 +45,7 @@ dev = [
 
 [project.scripts]
 bluelock = "bluelock.app:main"
+bluelock_mon = "bluelock.mon:main"
 
 [project.urls]
 Homepage = "https://github.com/gunchev/bluelock"

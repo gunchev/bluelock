@@ -17,7 +17,7 @@ NO_SIGNAL = -127
 class SignalProcessor:
     """Maintains a ring buffer of RSSI readings and provides smoothed values."""
 
-    def __init__(self, buffer_size: int = 16) -> None:
+    def __init__(self, buffer_size: int = 4) -> None:
         self._buffer_size = max(1, buffer_size)
         self._buffer: collections.deque[int] = collections.deque(maxlen=self._buffer_size)
 
@@ -82,3 +82,11 @@ class SignalProcessor:
     def reset(self) -> None:
         """Clear all buffered readings."""
         self._buffer.clear()
+
+
+def estimate_distance_m(rssi: float) -> float:
+    """Estimate distance in metres from a single RSSI reading."""
+    if rssi <= NO_SIGNAL + 1:
+        return 1000.0
+    exponent = (_TX_POWER_AT_1M - rssi) / (10.0 * _PATH_LOSS_EXPONENT)
+    return math.pow(10.0, exponent)

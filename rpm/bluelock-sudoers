@@ -1,0 +1,3 @@
+## Allow members of the 'users' group to query Bluetooth connection RSSI
+## via btmgmt without a password. Required by bluelock for proximity detection.
+%users ALL=(ALL) NOPASSWD: /usr/bin/btmgmt conn-info *

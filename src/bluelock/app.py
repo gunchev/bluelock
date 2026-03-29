@@ -130,8 +130,7 @@ class BlueLockApp:
     def _show_preferences(self) -> None:
         from bluelock.config_dialog import ConfigDialog
         if self._config_dialog is not None:
-            self._config_dialog.raise_()
-            self._config_dialog.activateWindow()
+            self._config_dialog.reject()
             return
 
         dlg = ConfigDialog(self._config)

@@ -12,7 +12,6 @@ unlock and lock the desktop session. Prepare a plan, ask when there are options 
 and write requirements and plan in markdown. The app layout should be with `src` directory, Makefile, similar
 to [keyclean](/home/dgunchev/github/gunchev/keyclean).
 
-
 ## Prompt 2
 
 Write the plan in `PLAN.md`.
@@ -69,3 +68,95 @@ self._on_interfaces_added)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 TypeError: callable must be a method of a QtCore.QObject instance decorated by QtCore.pyqtSlot
 ```
+
+## Prompt 8
+
+After starting the application with `make run` pressing Ctrl+C is ignored, it does not exit.
+
+## Prompt 9
+
+At start, Ctrl+C is ignored till the configuration dialog is dismissed. Closing it and right-clicking to get it back
+honors Ctrl+C.
+
+## Prompt 10
+
+Pressing scan does not show any available devices. I get the following logs though:
+
+```
+INFO bluelock.app: No device configured — opening preferences
+INFO bluelock.bluetooth._bluez_dbus: Starting device scan (timeout=10000ms)
+qt.dbus.integration: Could not connect "org.freedesktop.DBus.ObjectManager" to _on_interfaces_added(QString,PyQt_PyObject) : Type not registered with QtDBus in parameter list: PyQt_PyObject
+INFO bluelock.bluetooth._bluez_dbus: Stopping device scan
+qt.dbus.integration: Could not disconnect "org.freedesktop.DBus.ObjectManager" to _on_interfaces_added(QString,PyQt_PyObject) : Type not registered with QtDBus in parameter list: PyQt_PyObject
+```
+
+## Prompt 11
+
+There is a bluetooth device "Don XQ-DQ54" with MAC address "XX:XX:XX:XX:XX:XX". Why can't I see it in the list?
+The command `bt-device -l` shows it.
+
+## Prompt 12
+
+I can see it reliably now, but the RSSI remains -100.
+
+## Prompt 13
+
+The readings are strange and inconsistent. Make a command line app that accepts a MAC and displays RSSI "real-time" -
+`uv run bluelock_mon 'XX:XX:XX:XX:XX:XX'`.
+
+## Prompt 14
+
+I get `-48 dBm` all the time. If I turn off the bluetooth on the device I get a single
+`21.7s  PropsChanged    (keys: Connected)`. When I turn it back on - again `PropsChanged    (keys: Connected)`.
+But the signal remains "-48 dBm".
+
+## Prompt 15
+
+Running `btmgmt get-conn-info XX:XX:XX:XX:XX:XX 'BR/EDR'` results in error
+`Invalid command in menu mgmt: get-conn-info`. The `hcitool` does display from 0 to -18 when I move the device.
+
+## Prompt 16
+
+The `sudo btmgmt conn-info XX:XX:XX:XX:XX:XX 'BR/EDR'` does work, why remove it? Also, `/usr/bin/hcitool` is part
+of `bluez-deprecated`, which will be removed soon.
+
+## Prompt 17
+
+Keep both options, `btmgmt` will require extra group or sudo.
+
+## Prompt 18
+
+Now `sudo uv run bluelock_mon 'XX:XX:XX:XX:XX:XX'` works. What permissions do I need to run
+`btmgmt conn-info XX:XX:XX:XX:XX:XX 'BR/EDR'` without sudo?
+
+## Prompt 19
+
+Yes, let's go that route. There is no `bluetooth` group though, at all, in the whole system. How about the `users` group?
+
+## Prompt 20
+
+Nice, both report the same RSSI. Make the preferences dialog show up and hide on left button click on the icon.
+Make the dialog 50% wider and two tabs: selecting the device and configuration. This will show more devices at once.
+Check why the distance remains '-' all the time too. Make both durations default to 4 seconds.
+
+## Prompt 21
+
+Move the RSSI display to tab 2 and tab 1's device list resize vertically with the window. "Use Selected" should
+move to tab 2.
+
+## Prompt 22
+
+Make double clicking on a device on the device table select the device and move to page 2. Move the "Use selected
+device" button next to "Search" and name it "Use".
+
+## Prompt 23
+
+Increase the "MAC" column width by 50% to fit the whole MAC.
+
+## Prompt 24
+
+Make the config window 20% taller and commit the changes so far.
+
+## Prompt 25
+
+Update PROMPT.md for me please, with all prompts. Mask the MAC addresses with 'XX:XX:XX:XX:XX:XX'.

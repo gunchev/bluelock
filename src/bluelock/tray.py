@@ -104,6 +104,11 @@ class TrayIcon(QObject):
         act_quit.triggered.connect(self.quit_requested)
 
         self._tray.setContextMenu(menu)
+        self._tray.activated.connect(self._on_activated)
+
+    def _on_activated(self, reason: QSystemTrayIcon.ActivationReason) -> None:
+        if reason == QSystemTrayIcon.ActivationReason.Trigger:
+            self.preferences_requested.emit()
 
     def _on_about(self) -> None:
         from bluelock.about_dialog import AboutDialog

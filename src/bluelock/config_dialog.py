@@ -16,15 +16,20 @@ from PyQt6.QtWidgets import (
     QLineEdit,
     QProgressBar,
     QPushButton,
+    QScrollArea,
+    QSizePolicy,
     QSlider,
     QSpinBox,
+    QTabWidget,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
+    QWidget,
 )
 
 from bluelock.bluetooth._types import DeviceInfo
 from bluelock.config import Config
+from bluelock.signal_processor import estimate_distance_m
 
 log = logging.getLogger(__name__)
 
@@ -33,19 +38,16 @@ _RSSI_MAX = 0
 
 
 class ConfigDialog(QDialog):
-    """Configuration dialog.
-
-    Accepts a Config to pre-populate fields and emits the updated Config
-    on acceptance. The caller passes monitor signals in via connect_monitor().
-    """
+    """Configuration dialog."""
 
     def __init__(self, config: Config, parent=None) -> None:
         super().__init__(parent)
         self.setWindowTitle("BlueLock — Preferences")
-        self.setMinimumWidth(480)
+        self.setMinimumSize(720, 600)
 
         self._config = config
-        self._scan_results: dict[str, DeviceInfo] = {}   # mac → DeviceInfo
+        self._monitor = None
+        self._scan_results: dict[str, DeviceInfo] = {}
 
         self._build_ui()
         self._populate(config)
@@ -55,7 +57,8 @@ class ConfigDialog(QDialog):
     # ------------------------------------------------------------------ #
 
     def connect_monitor(self, monitor) -> None:
-        """Connect to a Bluetooth monitor's signals for live RSSI display and scan results."""
+        """Connect to a Bluetooth monitor's signals."""
+        self._monitor = monitor
         monitor.rssi_updated.connect(self._on_rssi_update)
         monitor.scan_result.connect(self._on_scan_result)
         monitor.scan_finished.connect(self._on_scan_finished)
@@ -92,48 +95,67 @@ class ConfigDialog(QDialog):
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
 
-        layout.addWidget(self._build_device_group())
-        layout.addWidget(self._build_signal_group())
-        layout.addWidget(self._build_thresholds_group())
-        layout.addWidget(self._build_commands_group())
-        layout.addWidget(self._build_advanced_group())
+        self._tabs = QTabWidget()
+        self._tabs.addTab(self._build_device_tab(), "Device")
+        self._tabs.addTab(self._build_settings_tab(), "Settings")
+        layout.addWidget(self._tabs)
 
-        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok |
-                                   QDialogButtonBox.StandardButton.Cancel)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
 
-    def _build_device_group(self) -> QGroupBox:
-        box = QGroupBox("Bluetooth Device")
-        form = QFormLayout(box)
+    def _build_device_tab(self) -> QWidget:
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+        layout.setContentsMargins(4, 4, 4, 4)
 
+        # MAC + Scan controls
+        top = QWidget()
+        top_form = QFormLayout(top)
+        top_form.setContentsMargins(0, 0, 0, 0)
         self._mac_edit = QLineEdit()
         self._mac_edit.setPlaceholderText("AA:BB:CC:DD:EE:FF")
-
-        scan_btn = QPushButton("Scan")
-        scan_btn.clicked.connect(self._on_scan_clicked)
-        self._scan_btn = scan_btn
-
+        self._scan_btn = QPushButton("Scan")
+        self._scan_btn.clicked.connect(self._on_scan_clicked)
+        use_btn = QPushButton("Use")
+        use_btn.clicked.connect(self._on_device_selected)
         mac_row = QHBoxLayout()
         mac_row.addWidget(self._mac_edit)
-        mac_row.addWidget(scan_btn)
-        form.addRow("MAC address:", mac_row)
+        mac_row.addWidget(self._scan_btn)
+        mac_row.addWidget(use_btn)
+        top_form.addRow("MAC address:", mac_row)
+        layout.addWidget(top)
 
+        # Device table — expands to fill the tab
         self._device_table = QTableWidget(0, 2)
         self._device_table.setHorizontalHeaderLabels(["MAC", "Name"])
+        self._device_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         self._device_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         self._device_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self._device_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
-        self._device_table.setMaximumHeight(140)
+        self._device_table.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self._device_table.itemDoubleClicked.connect(self._on_device_selected)
-        form.addRow(self._device_table)
+        layout.addWidget(self._device_table, stretch=1)
 
-        use_btn = QPushButton("Use Selected")
-        use_btn.clicked.connect(self._on_device_selected)
-        form.addRow(use_btn)
+        return tab
 
-        return box
+    def _build_settings_tab(self) -> QWidget:
+        # Wrap in a scroll area so it stays usable if the window is small
+        inner = QWidget()
+        layout = QVBoxLayout(inner)
+
+        layout.addWidget(self._build_signal_group())
+        layout.addWidget(self._build_thresholds_group())
+        layout.addWidget(self._build_commands_group())
+        layout.addWidget(self._build_advanced_group())
+        layout.addStretch()
+
+        scroll = QScrollArea()
+        scroll.setWidget(inner)
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        return scroll
 
     def _build_signal_group(self) -> QGroupBox:
         box = QGroupBox("Signal Strength")
@@ -209,7 +231,7 @@ class ConfigDialog(QDialog):
 
         self._buffer_spin = QSpinBox()
         self._buffer_spin.setRange(1, 255)
-        self._buffer_spin.setToolTip("Number of RSSI readings to average (larger = smoother but slower)")
+        self._buffer_spin.setToolTip("Number of RSSI readings to average")
         form.addRow("Buffer size:", self._buffer_spin)
 
         self._interval_spin = QDoubleSpinBox()
@@ -245,15 +267,20 @@ class ConfigDialog(QDialog):
     def _on_rssi_update(self, rssi: int) -> None:
         self._rssi_bar.setValue(max(_RSSI_MIN, min(_RSSI_MAX, rssi)))
         self._rssi_label.setText(f"RSSI: {rssi} dBm")
+        dist = estimate_distance_m(rssi)
+        if dist < 999:
+            self._dist_label.setText(f"Distance: ≈{dist:.1f} m")
+        else:
+            self._dist_label.setText("Distance: —")
 
     def _on_scan_clicked(self) -> None:
         self._scan_btn.setEnabled(False)
         self._scan_btn.setText("Scanning…")
         self._device_table.setRowCount(0)
         self._scan_results.clear()
-        # Re-enable after 12 s regardless (matches default scan timeout of 10 s + buffer)
         QTimer.singleShot(12_000, self._on_scan_done)
-        self.scan_requested = True
+        if self._monitor is not None:
+            self._monitor.start_scan()
 
     def _on_scan_done(self) -> None:
         self._scan_btn.setEnabled(True)
@@ -278,6 +305,7 @@ class ConfigDialog(QDialog):
         item = self._device_table.item(row, 0)
         if item:
             self._mac_edit.setText(item.text())
+            self._tabs.setCurrentIndex(1)
 
     # ------------------------------------------------------------------ #
     # Helpers                                                              #

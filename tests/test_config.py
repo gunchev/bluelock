@@ -9,9 +9,9 @@ class TestConfigDefaults:
         assert c.device_mac == ""
         assert c.device_name == ""
         assert c.lock_rssi_threshold == -15
-        assert c.lock_duration == 6
+        assert c.lock_duration == 4
         assert c.unlock_rssi_threshold == -10
-        assert c.unlock_duration == 1
+        assert c.unlock_duration == 4
         assert c.lock_command == ""
         assert c.unlock_command == ""
         assert c.buffer_size == 16
@@ -64,7 +64,7 @@ class TestConfigLoadSave:
         loaded = Config.load(tmp_config_path)
         assert loaded.device_mac == "12:34:56:78:9A:BC"
         assert loaded.device_name == ""         # default
-        assert loaded.lock_duration == 6        # default
+        assert loaded.lock_duration == 4        # default
 
     def test_save_creates_parent_directory(self, tmp_path):
         path = tmp_path / "subdir" / "config.toml"

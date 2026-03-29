@@ -13,9 +13,9 @@ class Config:
     device_mac: str = ""
     device_name: str = ""
     lock_rssi_threshold: int = -15     # lock when RSSI drops below this (dBm)
-    lock_duration: int = 6             # seconds below threshold before locking
+    lock_duration: int = 4             # seconds below threshold before locking
     unlock_rssi_threshold: int = -10   # unlock when RSSI rises above this (dBm)
-    unlock_duration: int = 1           # seconds above threshold before unlocking
+    unlock_duration: int = 4           # seconds above threshold before unlocking
     lock_command: str = ""             # empty = use D-Bus ScreenSaver
     unlock_command: str = ""           # empty = use D-Bus ScreenSaver
     buffer_size: int = 16              # ring buffer size for RSSI averaging
@@ -53,9 +53,9 @@ class Config:
             device_mac=str(device.get("mac", "")),
             device_name=str(device.get("name", "")),
             lock_rssi_threshold=int(thresholds.get("lock_rssi", -15)),
-            lock_duration=int(thresholds.get("lock_duration", 6)),
+            lock_duration=int(thresholds.get("lock_duration", 4)),
             unlock_rssi_threshold=int(thresholds.get("unlock_rssi", -10)),
-            unlock_duration=int(thresholds.get("unlock_duration", 1)),
+            unlock_duration=int(thresholds.get("unlock_duration", 4)),
             lock_command=str(commands.get("lock", "")),
             unlock_command=str(commands.get("unlock", "")),
             buffer_size=int(advanced.get("buffer_size", 16)),
