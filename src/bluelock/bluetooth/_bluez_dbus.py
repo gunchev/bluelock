@@ -5,7 +5,7 @@ import logging
 import subprocess
 import time
 
-from PyQt6.QtCore import QTimer
+from PyQt6.QtCore import QTimer, pyqtSlot
 from PyQt6.QtDBus import QDBusConnection, QDBusInterface, QDBusMessage
 
 from bluelock.bluetooth._base import AbstractBluetoothMonitor
@@ -131,23 +131,23 @@ class BluezDBusMonitor(AbstractBluetoothMonitor):
 
     def _connect_object_manager_signals(self) -> None:
         self._bus.connect(_BLUEZ_SVC, "/", _DBUS_OBJMGR_IFACE, "InterfacesAdded",
-                          self._on_interfaces_added)
+                          "oa{sa{sv}}", self._on_interfaces_added)
         self._bus.connect(_BLUEZ_SVC, "/", _DBUS_OBJMGR_IFACE, "InterfacesRemoved",
-                          self._on_interfaces_removed)
+                          "oas", self._on_interfaces_removed)
 
     def _disconnect_object_manager_signals(self) -> None:
         self._bus.disconnect(_BLUEZ_SVC, "/", _DBUS_OBJMGR_IFACE, "InterfacesAdded",
-                             self._on_interfaces_added)
+                             "oa{sa{sv}}", self._on_interfaces_added)
         self._bus.disconnect(_BLUEZ_SVC, "/", _DBUS_OBJMGR_IFACE, "InterfacesRemoved",
-                             self._on_interfaces_removed)
+                             "oas", self._on_interfaces_removed)
 
     def _connect_device_signals(self, path: str) -> None:
         self._bus.connect(_BLUEZ_SVC, path, _DBUS_PROPS_IFACE, "PropertiesChanged",
-                          self._on_properties_changed)
+                          "sa{sv}as", self._on_properties_changed)
 
     def _disconnect_device_signals(self, path: str) -> None:
         self._bus.disconnect(_BLUEZ_SVC, path, _DBUS_PROPS_IFACE, "PropertiesChanged",
-                             self._on_properties_changed)
+                             "sa{sv}as", self._on_properties_changed)
 
     # ------------------------------------------------------------------ #
     # BlueZ adapter control                                                #
@@ -172,6 +172,7 @@ class BluezDBusMonitor(AbstractBluetoothMonitor):
     # D-Bus signal handlers                                                #
     # ------------------------------------------------------------------ #
 
+    @pyqtSlot(str, dict, list)
     def _on_properties_changed(self, interface: str, changed: dict, invalidated: list) -> None:
         """Handle PropertiesChanged on a BlueZ device object."""
         if interface != _BLUEZ_DEVICE_IFACE:
@@ -182,6 +183,7 @@ class BluezDBusMonitor(AbstractBluetoothMonitor):
             self._last_rssi_time = time.monotonic()
             self.rssi_updated.emit(int(rssi))
 
+    @pyqtSlot(str, dict)
     def _on_interfaces_added(self, path: str, interfaces: dict) -> None:
         """Handle a new BlueZ object appearing (device found during scan)."""
         if _BLUEZ_DEVICE_IFACE not in interfaces:
@@ -204,6 +206,7 @@ class BluezDBusMonitor(AbstractBluetoothMonitor):
                 self._last_rssi_time = time.monotonic()
                 self.rssi_updated.emit(int(rssi))
 
+    @pyqtSlot(str, list)
     def _on_interfaces_removed(self, path: str, interfaces: list) -> None:
         """Handle a BlueZ object disappearing (device went out of range)."""
         if _BLUEZ_DEVICE_IFACE not in interfaces:

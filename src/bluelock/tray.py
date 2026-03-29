@@ -12,7 +12,7 @@ from bluelock.state_machine import ProximityState
 
 log = logging.getLogger(__name__)
 
-_ICONS_DIR = Path(__file__).parent.parent.parent / "resources" / "icons"
+_ICONS_DIR = Path(__file__).parent / "icons"
 
 _ICON_FILES: dict[str, str] = {
     "close":  "bluelock_close.svg",
