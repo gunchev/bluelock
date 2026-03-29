@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=BlueLock
+GenericName=Bluetooth Proximity Lock
+Comment=Lock and unlock your session based on Bluetooth device proximity
+Exec=bluelock
+Icon=bluelock
+Terminal=false
+Categories=Utility;Security;Qt;
+Keywords=bluetooth;proximity;lock;security;kde;
+StartupNotify=false
+X-KDE-StartupNotify=false

@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <!-- BlueLock app icon: Bluetooth symbol with a padlock -->
+  <circle cx="24" cy="24" r="22" fill="#1565c0" opacity="0.12"/>
+  <!-- Bluetooth symbol -->
+  <path d="M24 6 L24 38 L33 29 L26 24 L33 19 Z" fill="none" stroke="#1565c0" stroke-width="3" stroke-linejoin="round"/>
+  <line x1="24" y1="38" x2="15" y2="29" stroke="#1565c0" stroke-width="3" stroke-linecap="round"/>
+  <line x1="24" y1="6" x2="15" y2="15" stroke="#1565c0" stroke-width="3" stroke-linecap="round"/>
+  <!-- Small padlock (bottom right) -->
+  <rect x="30" y="33" width="14" height="11" rx="2.5" fill="#1565c0"/>
+  <path d="M33 33 L33 29.5 Q37 24.5 41 29.5 L41 33" fill="none" stroke="#1565c0" stroke-width="2.5" stroke-linecap="round"/>
+  <circle cx="37" cy="39" r="1.8" fill="white"/>
+  <rect x="36.2" y="39" width="1.6" height="3" rx="0.5" fill="white"/>
+</svg>

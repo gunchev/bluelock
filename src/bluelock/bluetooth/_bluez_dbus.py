@@ -1,0 +1,278 @@
+"""BlueZ D-Bus Bluetooth monitor using PyQt6.QtDBus."""
+from __future__ import annotations
+
+import logging
+import subprocess
+import time
+
+from PyQt6.QtCore import QTimer
+from PyQt6.QtDBus import QDBusConnection, QDBusInterface, QDBusMessage
+
+from bluelock.bluetooth._base import AbstractBluetoothMonitor
+from bluelock.bluetooth._types import DeviceInfo, mac_to_dbus_path, normalize_mac
+
+log = logging.getLogger(__name__)
+
+_BLUEZ_SVC = "org.bluez"
+_BLUEZ_ADAPTER_IFACE = "org.bluez.Adapter1"
+_BLUEZ_DEVICE_IFACE = "org.bluez.Device1"
+_DBUS_OBJMGR_IFACE = "org.freedesktop.DBus.ObjectManager"
+_DBUS_PROPS_IFACE = "org.freedesktop.DBus.Properties"
+_DEFAULT_ADAPTER = "/org/bluez/hci0"
+
+# If no RSSI update arrives within this many milliseconds, try hcitool fallback
+_RSSI_STALE_MS = 5_000
+
+
+class BluezDBusMonitor(AbstractBluetoothMonitor):
+    """Monitors Bluetooth device proximity via BlueZ D-Bus signals.
+
+    Primary method: subscribe to PropertiesChanged on org.bluez.Device1.
+    BlueZ emits RSSI property updates during active discovery.
+
+    Fallback: for connected classic BT devices where BlueZ does not emit RSSI
+    via D-Bus, poll 'hcitool rssi <mac>' on a timer.
+    """
+
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+        self._bus = QDBusConnection.systemBus()
+        self._adapter_path = _DEFAULT_ADAPTER
+        self._target_mac = ""
+        self._target_path = ""
+        self._monitoring = False
+        self._scanning = False
+        self._last_rssi_time = 0.0
+
+        # Timer for hcitool fallback when D-Bus RSSI goes stale
+        self._stale_timer = QTimer(self)
+        self._stale_timer.setInterval(_RSSI_STALE_MS)
+        self._stale_timer.timeout.connect(self._on_stale_check)
+
+        # Timer to end a scan automatically
+        self._scan_timer = QTimer(self)
+        self._scan_timer.setSingleShot(True)
+        self._scan_timer.timeout.connect(self.stop_scan)
+
+        if not self._bus.isConnected():
+            log.error("Cannot connect to D-Bus system bus")
+
+    # ------------------------------------------------------------------ #
+    # Public API                                                           #
+    # ------------------------------------------------------------------ #
+
+    def start_monitoring(self, mac: str) -> None:
+        """Begin RSSI monitoring for the given MAC address."""
+        mac = normalize_mac(mac)
+        if not mac:
+            self.error_occurred.emit(f"Invalid MAC address: {mac!r}")
+            return
+
+        if self._monitoring:
+            self.stop_monitoring()
+
+        self._target_mac = mac
+        self._target_path = mac_to_dbus_path(self._adapter_path, mac)
+        self._monitoring = True
+        self._last_rssi_time = 0.0
+        log.info("Starting monitoring for %s (%s)", mac, self._target_path)
+
+        self._connect_object_manager_signals()
+        self._connect_device_signals(self._target_path)
+        self._start_discovery()
+        self._stale_timer.start()
+
+    def stop_monitoring(self) -> None:
+        """Stop RSSI monitoring."""
+        if not self._monitoring:
+            return
+        log.info("Stopping monitoring for %s", self._target_mac)
+        self._stale_timer.stop()
+        self._stop_discovery()
+        self._disconnect_device_signals(self._target_path)
+        self._disconnect_object_manager_signals()
+        self._monitoring = False
+        self._target_mac = ""
+        self._target_path = ""
+
+    def start_scan(self, timeout_ms: int = 10_000) -> None:
+        """Scan for nearby Bluetooth devices."""
+        if self._scanning:
+            return
+        log.info("Starting device scan (timeout=%dms)", timeout_ms)
+        self._scanning = True
+        self._connect_object_manager_signals()
+        self._start_discovery()
+        self._scan_timer.start(timeout_ms)
+
+    def stop_scan(self) -> None:
+        """Stop an in-progress scan."""
+        if not self._scanning:
+            return
+        log.info("Stopping device scan")
+        self._scan_timer.stop()
+        if not self._monitoring:
+            self._stop_discovery()
+            self._disconnect_object_manager_signals()
+        self._scanning = False
+        self.scan_finished.emit()
+
+    @property
+    def is_monitoring(self) -> bool:
+        return self._monitoring
+
+    @property
+    def is_scanning(self) -> bool:
+        return self._scanning
+
+    # ------------------------------------------------------------------ #
+    # D-Bus signal connections                                             #
+    # ------------------------------------------------------------------ #
+
+    def _connect_object_manager_signals(self) -> None:
+        self._bus.connect(_BLUEZ_SVC, "/", _DBUS_OBJMGR_IFACE, "InterfacesAdded",
+                          self._on_interfaces_added)
+        self._bus.connect(_BLUEZ_SVC, "/", _DBUS_OBJMGR_IFACE, "InterfacesRemoved",
+                          self._on_interfaces_removed)
+
+    def _disconnect_object_manager_signals(self) -> None:
+        self._bus.disconnect(_BLUEZ_SVC, "/", _DBUS_OBJMGR_IFACE, "InterfacesAdded",
+                             self._on_interfaces_added)
+        self._bus.disconnect(_BLUEZ_SVC, "/", _DBUS_OBJMGR_IFACE, "InterfacesRemoved",
+                             self._on_interfaces_removed)
+
+    def _connect_device_signals(self, path: str) -> None:
+        self._bus.connect(_BLUEZ_SVC, path, _DBUS_PROPS_IFACE, "PropertiesChanged",
+                          self._on_properties_changed)
+
+    def _disconnect_device_signals(self, path: str) -> None:
+        self._bus.disconnect(_BLUEZ_SVC, path, _DBUS_PROPS_IFACE, "PropertiesChanged",
+                             self._on_properties_changed)
+
+    # ------------------------------------------------------------------ #
+    # BlueZ adapter control                                                #
+    # ------------------------------------------------------------------ #
+
+    def _start_discovery(self) -> None:
+        adapter = QDBusInterface(_BLUEZ_SVC, self._adapter_path, _BLUEZ_ADAPTER_IFACE, self._bus)
+        reply = adapter.call("StartDiscovery")
+        if reply.type() == QDBusMessage.MessageType.ErrorMessage:
+            err = reply.errorMessage()
+            if "InProgress" not in err:
+                log.warning("StartDiscovery failed: %s", err)
+                self.error_occurred.emit(f"Bluetooth discovery error: {err}")
+
+    def _stop_discovery(self) -> None:
+        adapter = QDBusInterface(_BLUEZ_SVC, self._adapter_path, _BLUEZ_ADAPTER_IFACE, self._bus)
+        reply = adapter.call("StopDiscovery")
+        if reply.type() == QDBusMessage.MessageType.ErrorMessage:
+            log.debug("StopDiscovery: %s", reply.errorMessage())
+
+    # ------------------------------------------------------------------ #
+    # D-Bus signal handlers                                                #
+    # ------------------------------------------------------------------ #
+
+    def _on_properties_changed(self, interface: str, changed: dict, invalidated: list) -> None:
+        """Handle PropertiesChanged on a BlueZ device object."""
+        if interface != _BLUEZ_DEVICE_IFACE:
+            return
+        if "RSSI" in changed:
+            rssi = changed["RSSI"]
+            log.debug("RSSI update from D-Bus: %d dBm", rssi)
+            self._last_rssi_time = time.monotonic()
+            self.rssi_updated.emit(int(rssi))
+
+    def _on_interfaces_added(self, path: str, interfaces: dict) -> None:
+        """Handle a new BlueZ object appearing (device found during scan)."""
+        if _BLUEZ_DEVICE_IFACE not in interfaces:
+            return
+        props = interfaces[_BLUEZ_DEVICE_IFACE]
+        mac = normalize_mac(props.get("Address", ""))
+        name = str(props.get("Name", ""))
+        rssi = props.get("RSSI")
+        if not mac:
+            return
+
+        if self._scanning:
+            self.scan_result.emit(DeviceInfo(mac=mac, name=name, rssi=rssi))
+
+        if self._monitoring and mac == self._target_mac:
+            log.info("Target device appeared: %s", mac)
+            self._connect_device_signals(path)
+            self.device_appeared.emit()
+            if rssi is not None:
+                self._last_rssi_time = time.monotonic()
+                self.rssi_updated.emit(int(rssi))
+
+    def _on_interfaces_removed(self, path: str, interfaces: list) -> None:
+        """Handle a BlueZ object disappearing (device went out of range)."""
+        if _BLUEZ_DEVICE_IFACE not in interfaces:
+            return
+        if self._monitoring and path == self._target_path:
+            log.info("Target device disappeared: %s", self._target_mac)
+            self.device_disappeared.emit()
+
+    # ------------------------------------------------------------------ #
+    # hcitool fallback for stale RSSI                                      #
+    # ------------------------------------------------------------------ #
+
+    def _on_stale_check(self) -> None:
+        """Called periodically; if D-Bus RSSI is stale, try hcitool."""
+        if not self._monitoring or not self._target_mac:
+            return
+        age = time.monotonic() - self._last_rssi_time
+        if self._last_rssi_time == 0.0 or age > _RSSI_STALE_MS / 1000:
+            rssi = _hcitool_rssi(self._target_mac)
+            if rssi is not None:
+                log.debug("RSSI from hcitool fallback: %d dBm", rssi)
+                self._last_rssi_time = time.monotonic()
+                self.rssi_updated.emit(rssi)
+
+    # ------------------------------------------------------------------ #
+    # Utility: enumerate currently known devices from BlueZ                #
+    # ------------------------------------------------------------------ #
+
+    def get_known_devices(self) -> list[DeviceInfo]:
+        """Return devices currently known to BlueZ (no scan needed)."""
+        msg = QDBusMessage.createMethodCall(_BLUEZ_SVC, "/", _DBUS_OBJMGR_IFACE, "GetManagedObjects")
+        reply = self._bus.call(msg)
+        if reply.type() == QDBusMessage.MessageType.ErrorMessage:
+            log.warning("GetManagedObjects failed: %s", reply.errorMessage())
+            return []
+
+        devices = []
+        objects = reply.arguments()[0] if reply.arguments() else {}
+        for _path, interfaces in objects.items():
+            if _BLUEZ_DEVICE_IFACE not in interfaces:
+                continue
+            props = interfaces[_BLUEZ_DEVICE_IFACE]
+            mac = normalize_mac(props.get("Address", ""))
+            if mac:
+                devices.append(DeviceInfo(
+                    mac=mac,
+                    name=str(props.get("Name", "")),
+                    rssi=props.get("RSSI"),
+                ))
+        return devices
+
+
+def _hcitool_rssi(mac: str) -> int | None:
+    """Read RSSI for a connected classic BT device via hcitool.
+
+    Returns the RSSI value (dBm) or None on failure.
+    This only works for devices with an active connection.
+    """
+    try:
+        result = subprocess.run(["hcitool", "rssi", mac], capture_output=True, text=True, timeout=3)
+        if result.returncode == 0:
+            # Output: "RSSI return value: -42"
+            for part in result.stdout.split():
+                try:
+                    val = int(part)
+                    if -120 <= val <= 0:
+                        return val
+                except ValueError:
+                    continue
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+        pass
+    return None

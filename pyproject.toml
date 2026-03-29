@@ -1,7 +1,69 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "bluelock"
+version = "0.1.0-dev"
+description = "Lock and unlock your KDE session based on Bluetooth device proximity."
+readme = "README.md"
+license = "Unlicense"
+requires-python = ">=3.11"
+authors = [
+    { name = "Doncho Nikolaev Gunchev" },
+]
+keywords = ["bluetooth", "proximity", "lock", "kde", "security"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: X11 Applications :: Qt",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: The Unlicense (Unlicense)",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Security",
+    "Topic :: Utilities",
+    "Typing :: Typed",
+]
+dependencies = [
+    "PyQt6>=6.5.0",
+]
+
+[dependency-groups]
+dev = [
+    "ruff",
+    "pytest",
+    "pytest-mock",
+    "pytest-cov",
+    "tox",
+    "twine",
+    "build",
+]
+
+[project.scripts]
+bluelock = "bluelock.app:main"
+
+[project.urls]
+Homepage = "https://github.com/gunchev/bluelock"
+Repository = "https://github.com/gunchev/bluelock"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/bluelock"]
+
 [tool.ruff]
+src = ["src"]
 line-length = 120
-# Enable pycodestyle (E, W), Pyflakes (F), and isort (I)
-select = ["E", "W", "F", "I"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "C4", "SIM"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
 # Disable rules that are too restrictive compared to autopep8
 ignore = [
     "E501", # Ignore line length violations (autopep8 handles this differently)

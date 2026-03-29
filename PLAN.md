@@ -111,7 +111,7 @@ Qt signals emitted: `rssi_updated(int)`, `device_connected(str)`, `device_discon
 
 ### `signal_processor.py` — RSSI Smoothing
 
-- Ring buffer (`collections.deque`) of configurable size (default 5)
+- Ring buffer (`collections.deque`) of configurable size (default 16)
 - Weighted moving average for smoothed RSSI
 - Distance estimation via log-distance path loss model: `d = 10^((tx_power - rssi) / (10 * n))` where
   `tx_power ≈ -59 dBm`, `n ≈ 2.5` (indoor)
@@ -181,7 +181,7 @@ dependencies = ["PyQt6>=6.5.0"]
 
 ### Development
 
-- `ruff` (lint + format)
+- `ruff` (lint + format), PEP-8 style
 - `pytest`, `pytest-mock`, `pytest-cov`
 - `tox`, `build`, `twine`
 
