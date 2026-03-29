@@ -91,7 +91,7 @@ rpmprep:
 	rm -rf ~/rpmbuild/RPMS/noarch/"$(name)"*.rpm ~/rpmbuild/SRPMS/"$(name)"*.src.rpm
 	python3 -m build --sdist
 	mkdir -p ~/rpmbuild/SOURCES
-	cp dist/$(name)-$(RPM_VER).tar.gz rpm/$(name).desktop rpm/$(name).svg ~/rpmbuild/SOURCES/
+	cp dist/$(name)-$(RPM_VER).tar.gz rpm/$(name).desktop rpm/$(name).svg rpm/$(name)-sudoers ~/rpmbuild/SOURCES/
 
 
 .PHONY: rpm
