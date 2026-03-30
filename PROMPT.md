@@ -272,3 +272,11 @@ make: *** [Makefile:112: run] Error 134
 ## Prompt 48 (Junie)
 
 Update PROMPT.md and commit the changes.
+
+## Prompt 49
+
+Make a new release 0.3.0. Build the RPM (make rpm) package.
+
+## Prompt 50
+
+Add logging to show when switching to polling and dbus and which tool was used. Remember if `sudo btmgmt` or `hcitool` are not available and don't try to run them again and again, once at app start.

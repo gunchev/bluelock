@@ -45,6 +45,8 @@ class BluezDBusMonitor(AbstractBluetoothMonitor):
         self._scanning = False
         self._last_rssi_time = 0.0
         self._poll_reachable = False   # True when btmgmt/hcitool last succeeded
+        self._using_poll = False
+        self._poll_tool = ""
 
         # Timer for hcitool RSSI polling (classic BT devices don't emit RSSI via PropertiesChanged)
         self._stale_timer = QTimer(self)
@@ -192,6 +194,10 @@ class BluezDBusMonitor(AbstractBluetoothMonitor):
         changed = args[1] if len(args) > 1 else {}
         if "RSSI" in changed:
             rssi = changed["RSSI"]
+            if self._using_poll:
+                log.info("Switching to D-Bus RSSI updates for %s", self._target_mac)
+                self._using_poll = False
+                self._poll_tool = ""
             log.debug("RSSI update from D-Bus: %d dBm", rssi)
             self._last_rssi_time = time.monotonic()
             self.rssi_updated.emit(int(rssi))
@@ -264,11 +270,17 @@ class BluezDBusMonitor(AbstractBluetoothMonitor):
             return
 
         rssi, _err = btmgmt_rssi(self._target_mac)
+        tool = "btmgmt"
         if rssi is None:
             rssi, _err = hcitool_rssi(self._target_mac)
+            tool = "hcitool"
 
         if rssi is not None:
-            log.debug("RSSI from poll: %d dBm", rssi)
+            if not self._using_poll or self._poll_tool != tool:
+                log.info("Switching to %s polling for %s", tool, self._target_mac)
+                self._using_poll = True
+                self._poll_tool = tool
+            log.debug("RSSI from poll (%s): %d dBm", tool, rssi)
             self._last_rssi_time = time.monotonic()
             self.rssi_updated.emit(rssi)
             if not self._poll_reachable:
