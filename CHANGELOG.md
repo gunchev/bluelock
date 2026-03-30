@@ -1,3 +1,18 @@
+## 0.3.1 — 2026-03-31
+
+### Changes since v0.3.0
+
+- afa29e0 Fix three post-Junie bugs; add ScreenSaverInhibitor unit tests
+- cea66fe Restore ScreenSaverInhibitor using dbus-python with dbus-send fallback
+- 7023177 Remove ScreenSaverInhibitor; add timestamps to log output
+- 143179a Replace Inhibit/UnInhibit with SimulateUserActivity for screensaver suppression
+- 95fe608 Fix ScreenSaverInhibitor.uninhibit() uint32 type mismatch
+- 7a3b263 Minor adjustments.
+- d2868a6 Add credit to Claude and Junnie in the about dialog
+- e1f9df0 Cache tool availability and add mode-switching logging
+- cb72fe3 Update RPM spec to include shared icon data
+- fc2a81b Start 0.3.1-dev
+
 ## 0.3.0 — 2026-03-30
 
 ### Changes since v0.2.0
