@@ -148,8 +148,9 @@ class BlueLockApp:
         dlg.connect_monitor(self._monitor)
         self._config_dialog = dlg
 
-        # Start a scan so the device list populates while the dialog is open
-        self._monitor.start_scan()
+        # Auto-scan only when no device is configured yet
+        if not self._config.devices:
+            self._monitor.start_scan()
 
         if dlg.exec():
             self._apply_config(dlg.current_config())
