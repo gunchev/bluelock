@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import QApplication
 
 from bluelock.bluetooth import get_monitor
 from bluelock.config import Config
-from bluelock.session_locker import LockError, ScreenSaverInhibitor, SessionLocker
+from bluelock.session_locker import LockError, SessionLocker
 from bluelock.signal_processor import SignalProcessor
 from bluelock.state_machine import ProximityState, ProximityStateMachine
 from bluelock.tray import TrayIcon
@@ -35,7 +35,6 @@ class BlueLockApp:
             unlock_duration=self._config.unlock_duration,
         )
         self._locker = SessionLocker(self._config.lock_command, self._config.unlock_command)
-        self._inhibitor = ScreenSaverInhibitor()
         self._tray = TrayIcon()
         self._device_present = False
 
@@ -104,7 +103,6 @@ class BlueLockApp:
                           self._processor.estimated_distance_m,
                           self._config.device_name, paused=False,
                           lock_pending=self._machine.lock_pending)
-        self._update_inhibit()
 
     def _do_lock(self) -> None:
         try:
@@ -126,17 +124,9 @@ class BlueLockApp:
     # Tray menu actions                                                    #
     # ------------------------------------------------------------------ #
 
-    def _update_inhibit(self) -> None:
-        """Inhibit screensaver when device is active and not paused; release otherwise."""
-        if self._machine.state == ProximityState.ACTIVE and not self._paused:
-            self._inhibitor.inhibit()
-        else:
-            self._inhibitor.uninhibit()
-
     def _set_paused(self, paused: bool) -> None:
         self._paused = paused
         log.info("Monitoring %s", "paused" if paused else "resumed")
-        self._update_inhibit()
 
     def _show_preferences(self) -> None:
         from bluelock.config_dialog import ConfigDialog
@@ -174,7 +164,6 @@ class BlueLockApp:
         )
         self._eval_timer.setInterval(int(new_cfg.scan_interval * 1000))
 
-        self._inhibitor.uninhibit()
         self._monitor.stop_monitoring()
         self._device_present = False
         self._processor.reset()
@@ -186,14 +175,15 @@ class BlueLockApp:
     def _quit(self) -> None:
         self._eval_timer.stop()
         self._monitor.stop_monitoring()
-        self._inhibitor.uninhibit()
         self._app.quit()
 
 
 def main() -> None:
     """Application entry point."""
     import signal
-    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+    logging.basicConfig(level=logging.INFO,
+                        format="%(asctime)s.%(msecs)03d %(levelname)s %(name)s: %(message)s",
+                        datefmt="%Y-%m-%d %H:%M:%S")
 
     app = QApplication(sys.argv)
     app.setApplicationName("BlueLock")
