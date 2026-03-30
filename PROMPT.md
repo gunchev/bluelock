@@ -240,3 +240,32 @@ Name the first tab "Devices" and the second "Settings".
 
 Update PROMPT.md.
 
+## Prompt 44 (Junie)
+
+Examine the project. Look for errors and optimization/cleanup opportunities.
+
+## Prompt 45
+
+Look like a good improvement list. Please proceed with these one by one and commit after each step.
+
+## Prompt 46
+
+Change the configuration logic to support only one device. What is left to improve?
+
+## Prompt 47
+
+I got this error:
+```
+WARNING bluelock.app: Bluetooth monitor error: Bluetooth discovery error: Operation already in progress
+INFO bluelock.bluetooth._bluez_dbus: Stopping device scan
+Traceback (most recent call last):
+File "/home/dgunchev/github/gunchev/bluelock/src/bluelock/config_dialog.py", line 371, in _on_accept
+_set_autostart(self._device_tab.autostart_enabled() if self._device_tab else False)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+TypeError: 'bool' object is not callable
+make: *** [Makefile:112: run] Error 134
+```
+
+## Prompt 48
+
+Update PROMPT.md and commit the changes.
