@@ -81,7 +81,7 @@ class _DeviceTab(QWidget):
 
     forget_requested = pyqtSignal(str)  # emits MAC address
 
-    def __init__(self, dev: DeviceConfig, parent=None) -> None:
+    def __init__(self, dev: DeviceConfig, buffer_size: int = 16, scan_interval: float = 1.0, parent=None) -> None:
         super().__init__(parent)
         self._mac = dev.mac
         self._name = dev.name
@@ -94,6 +94,7 @@ class _DeviceTab(QWidget):
         layout.addWidget(self._build_signal_group())
         layout.addWidget(self._build_thresholds_group())
         layout.addWidget(self._build_commands_group())
+        layout.addWidget(self._build_advanced_group())
         layout.addStretch()
 
         scroll = QScrollArea()
@@ -106,7 +107,19 @@ class _DeviceTab(QWidget):
         forget_btn.clicked.connect(lambda: self.forget_requested.emit(self._mac))
         outer.addWidget(forget_btn)
 
-        self._populate(dev)
+        self._populate(dev, buffer_size, scan_interval)
+
+    @property
+    def buffer_size(self) -> int:
+        return self._buffer_spin.value()
+
+    @property
+    def scan_interval(self) -> float:
+        return self._interval_spin.value()
+
+    @property
+    def autostart_enabled(self) -> bool:
+        return self._autostart_check.isChecked()
 
     def to_device_config(self) -> DeviceConfig:
         return DeviceConfig(
@@ -191,7 +204,24 @@ class _DeviceTab(QWidget):
         form.addRow("Unlock command:", self._unlock_cmd_edit)
         return box
 
-    def _populate(self, dev: DeviceConfig) -> None:
+    def _build_advanced_group(self) -> QGroupBox:
+        box = QGroupBox("Advanced")
+        form = QFormLayout(box)
+        self._buffer_spin = QSpinBox()
+        self._buffer_spin.setRange(1, 255)
+        self._buffer_spin.setToolTip("Number of RSSI readings to average")
+        form.addRow("Buffer size:", self._buffer_spin)
+        self._interval_spin = QDoubleSpinBox()
+        self._interval_spin.setRange(0.5, 10.0)
+        self._interval_spin.setSingleStep(0.5)
+        self._interval_spin.setSuffix(" s")
+        self._interval_spin.setToolTip("How often to evaluate the lock/unlock state")
+        form.addRow("Scan interval:", self._interval_spin)
+        self._autostart_check = QCheckBox("Start BlueLock automatically on login")
+        form.addRow("Auto-start:", self._autostart_check)
+        return box
+
+    def _populate(self, dev: DeviceConfig, buffer_size: int, scan_interval: float) -> None:
         self._lock_rssi_spin.setValue(dev.lock_rssi_threshold)
         self._lock_rssi_slider.setValue(dev.lock_rssi_threshold)
         self._lock_dur_spin.setValue(dev.lock_duration)
@@ -200,6 +230,9 @@ class _DeviceTab(QWidget):
         self._unlock_dur_spin.setValue(dev.unlock_duration)
         self._lock_cmd_edit.setText(dev.lock_command)
         self._unlock_cmd_edit.setText(dev.unlock_command)
+        self._buffer_spin.setValue(buffer_size)
+        self._interval_spin.setValue(scan_interval)
+        self._autostart_check.setChecked(_autostart_enabled())
 
 
 class ConfigDialog(QDialog):
@@ -216,10 +249,9 @@ class ConfigDialog(QDialog):
         self._device_tabs: dict[str, _DeviceTab] = {}  # mac → tab widget
 
         self._build_ui()
-        self._populate_global(config)
 
         for dev in config.devices:
-            self._add_device_tab(dev)
+            self._add_device_tab(dev, config.buffer_size, config.scan_interval)
 
         if config.devices:
             # Focus the last (most recently added) device tab
@@ -239,10 +271,11 @@ class ConfigDialog(QDialog):
     def current_config(self) -> Config:
         """Return a Config built from the current dialog state."""
         devices = [tab.to_device_config() for tab in self._device_tabs.values()]
+        tab = next(iter(self._device_tabs.values()), None)
         return Config(
             devices=devices,
-            buffer_size=self._buffer_spin.value(),
-            scan_interval=self._interval_spin.value(),
+            buffer_size=tab.buffer_size if tab else 16,
+            scan_interval=tab.scan_interval if tab else 1.0,
         )
 
     # ------------------------------------------------------------------ #
@@ -292,48 +325,16 @@ class ConfigDialog(QDialog):
         self._device_table.itemDoubleClicked.connect(self._on_device_selected)
         layout.addWidget(self._device_table, stretch=1)
 
-        # Global settings at the bottom of the scanner tab
-        layout.addWidget(self._build_advanced_group())
         return tab
 
-    def _build_advanced_group(self) -> QGroupBox:
-        box = QGroupBox("Advanced")
-        form = QFormLayout(box)
-
-        self._buffer_spin = QSpinBox()
-        self._buffer_spin.setRange(1, 255)
-        self._buffer_spin.setToolTip("Number of RSSI readings to average")
-        form.addRow("Buffer size:", self._buffer_spin)
-
-        self._interval_spin = QDoubleSpinBox()
-        self._interval_spin.setRange(0.5, 10.0)
-        self._interval_spin.setSingleStep(0.5)
-        self._interval_spin.setSuffix(" s")
-        self._interval_spin.setToolTip("How often to evaluate the lock/unlock state")
-        form.addRow("Scan interval:", self._interval_spin)
-
-        self._autostart_check = QCheckBox("Start BlueLock automatically on login")
-        self._autostart_check.setChecked(_autostart_enabled())
-        form.addRow("Auto-start:", self._autostart_check)
-
-        return box
-
-    def _add_device_tab(self, dev: DeviceConfig) -> int:
+    def _add_device_tab(self, dev: DeviceConfig, buffer_size: int = 16, scan_interval: float = 1.0) -> int:
         """Create a settings tab for *dev*, register it, lock the Device tab, and return the index."""
-        tab = _DeviceTab(dev)
+        tab = _DeviceTab(dev, buffer_size, scan_interval)
         tab.forget_requested.connect(self._on_forget)
         self._device_tabs[dev.mac] = tab
         idx = self._tabs.addTab(tab, dev.mac)
         self._tabs.setTabEnabled(0, False)
         return idx
-
-    # ------------------------------------------------------------------ #
-    # Populate / sync                                                      #
-    # ------------------------------------------------------------------ #
-
-    def _populate_global(self, c: Config) -> None:
-        self._buffer_spin.setValue(c.buffer_size)
-        self._interval_spin.setValue(c.scan_interval)
 
     # ------------------------------------------------------------------ #
     # Slot handlers                                                        #
@@ -370,8 +371,9 @@ class ConfigDialog(QDialog):
         self._on_scan_done()
 
     def _on_accept(self) -> None:
+        tab = next(iter(self._device_tabs.values()), None)
         try:
-            _set_autostart(self._autostart_check.isChecked())
+            _set_autostart(tab.autostart_enabled if tab else False)
         except OSError as e:
             log.warning("Could not update autostart entry: %s", e)
         self.accept()
