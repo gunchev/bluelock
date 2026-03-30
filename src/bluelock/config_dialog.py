@@ -241,7 +241,7 @@ class ConfigDialog(QDialog):
     def __init__(self, config: Config, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setWindowTitle("BlueLock — Preferences")
-        self.setMinimumSize(720, 690)
+        self.setMinimumSize(720, 715)
 
         self._config = config
         self._monitor = None
