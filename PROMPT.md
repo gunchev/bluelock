@@ -131,7 +131,8 @@ Now `sudo uv run bluelock_mon 'XX:XX:XX:XX:XX:XX'` works. What permissions do I 
 
 ## Prompt 19
 
-Yes, let's go that route. There is no `bluetooth` group though, at all, in the whole system. How about the `users` group?
+Yes, let's go that route. There is no `bluetooth` group though, at all, in the whole system. How about the `users`
+group?
 
 ## Prompt 20
 
@@ -202,7 +203,8 @@ Make release 0.1.0, update PROMPT.md, commit.
 
 ## Prompt 35
 
-`make rpm` ends with `install: cannot stat '/home/dgunchev/rpmbuild/SOURCES/bluelock-sudoers': No such file or directory`.
+`make rpm` ends with
+`install: cannot stat '/home/dgunchev/rpmbuild/SOURCES/bluelock-sudoers': No such file or directory`.
 
 ## Prompt 36
 
@@ -244,17 +246,18 @@ Update PROMPT.md.
 
 Examine the project. Look for errors and optimization/cleanup opportunities.
 
-## Prompt 45
+## Prompt 45 (Junie)
 
 Look like a good improvement list. Please proceed with these one by one and commit after each step.
 
-## Prompt 46
+## Prompt 46 (Junie)
 
 Change the configuration logic to support only one device. What is left to improve?
 
-## Prompt 47
+## Prompt 47 (Junie)
 
 I got this error:
+
 ```
 WARNING bluelock.app: Bluetooth monitor error: Bluetooth discovery error: Operation already in progress
 INFO bluelock.bluetooth._bluez_dbus: Stopping device scan
@@ -266,6 +269,6 @@ TypeError: 'bool' object is not callable
 make: *** [Makefile:112: run] Error 134
 ```
 
-## Prompt 48
+## Prompt 48 (Junie)
 
 Update PROMPT.md and commit the changes.

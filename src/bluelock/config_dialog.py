@@ -246,16 +246,12 @@ class ConfigDialog(QDialog):
         self._config = config
         self._monitor = None
         self._scan_results: dict[str, DeviceInfo] = {}
-        self._device_tabs: dict[str, _DeviceTab] = {}  # mac → tab widget
+        self._device_tab: _DeviceTab | None = None
 
         self._build_ui()
 
-        for dev in config.devices:
-            self._add_device_tab(dev, config.buffer_size, config.scan_interval)
-
-        if config.devices:
-            # Focus the last (most recently added) device tab
-            self._tabs.setCurrentIndex(self._tabs.count() - 1)
+        if config.device:
+            self._set_device_tab(config.device, config.buffer_size, config.scan_interval)
 
     # ------------------------------------------------------------------ #
     # Public                                                               #
@@ -270,12 +266,10 @@ class ConfigDialog(QDialog):
 
     def current_config(self) -> Config:
         """Return a Config built from the current dialog state."""
-        devices = [tab.to_device_config() for tab in self._device_tabs.values()]
-        tab = next(iter(self._device_tabs.values()), None)
         return Config(
-            devices=devices,
-            buffer_size=tab.buffer_size if tab else 16,
-            scan_interval=tab.scan_interval if tab else 1.0,
+            device=self._device_tab.to_device_config() if self._device_tab else None,
+            buffer_size=self._device_tab.buffer_size if self._device_tab else 16,
+            scan_interval=self._device_tab.scan_interval if self._device_tab else 1.0,
         )
 
     # ------------------------------------------------------------------ #
@@ -327,13 +321,16 @@ class ConfigDialog(QDialog):
 
         return tab
 
-    def _add_device_tab(self, dev: DeviceConfig, buffer_size: int = 16, scan_interval: float = 1.0) -> int:
-        """Create a settings tab for *dev*, register it, lock the Device tab, and return the index."""
-        tab = _DeviceTab(dev, buffer_size, scan_interval)
-        tab.forget_requested.connect(self._on_forget)
-        self._device_tabs[dev.mac] = tab
-        idx = self._tabs.addTab(tab, "Settings")
+    def _set_device_tab(self, dev: DeviceConfig, buffer_size: int = 16, scan_interval: float = 1.0) -> int:
+        """Create or update the settings tab for *dev*, lock the Device tab, and return the index."""
+        if self._device_tab:
+            self._tabs.removeTab(1)
+
+        self._device_tab = _DeviceTab(dev, buffer_size, scan_interval)
+        self._device_tab.forget_requested.connect(self._on_forget)
+        idx = self._tabs.addTab(self._device_tab, "Settings")
         self._tabs.setTabEnabled(0, False)
+        self._tabs.setCurrentIndex(idx)
         return idx
 
     # ------------------------------------------------------------------ #
@@ -341,9 +338,8 @@ class ConfigDialog(QDialog):
     # ------------------------------------------------------------------ #
 
     def _on_rssi_update(self, rssi: int) -> None:
-        tab = self._device_tabs.get(self._config.device_mac)
-        if tab:
-            tab.update_rssi(rssi)
+        if self._device_tab:
+            self._device_tab.update_rssi(rssi)
 
     def _on_scan_clicked(self) -> None:
         self._scan_btn.setEnabled(False)
@@ -371,18 +367,14 @@ class ConfigDialog(QDialog):
         self._on_scan_done()
 
     def _on_accept(self) -> None:
-        tab = next(iter(self._device_tabs.values()), None)
         try:
-            _set_autostart(tab.autostart_enabled if tab else False)
+            _set_autostart(self._device_tab.autostart_enabled if self._device_tab else False)
         except OSError as e:
             log.warning("Could not update autostart entry: %s", e)
         self.accept()
 
     def _on_device_selected(self) -> None:
         """Use the selected device: create its settings tab and lock the Device tab."""
-        if self._device_tabs:
-            return
-
         row = self._device_table.currentRow()
         mac = self._mac_edit.text().strip()
         name = ""
@@ -397,16 +389,13 @@ class ConfigDialog(QDialog):
         if not mac:
             return
 
-        idx = self._add_device_tab(DeviceConfig(mac=mac, name=name))
-        self._tabs.setCurrentIndex(idx)
+        self._set_device_tab(DeviceConfig(mac=mac, name=name))
 
     def _on_forget(self, mac: str) -> None:
-        """Remove the device tab for *mac* and unlock the Device tab."""
-        tab = self._device_tabs.pop(mac, None)
-        if tab is None:
+        """Remove the device tab and unlock the Device tab."""
+        if self._device_tab is None:
             return
-        idx = self._tabs.indexOf(tab)
-        if idx >= 0:
-            self._tabs.removeTab(idx)
+        self._device_tab = None
+        self._tabs.removeTab(1)
         self._tabs.setTabEnabled(0, True)
         self._tabs.setCurrentIndex(0)

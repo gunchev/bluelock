@@ -149,7 +149,7 @@ class BlueLockApp:
         self._config_dialog = dlg
 
         # Auto-scan only when no device is configured yet
-        if not self._config.devices:
+        if not self._config.device:
             self._monitor.start_scan()
 
         if dlg.exec():

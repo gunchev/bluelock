@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import enum
 import logging
+import time
 
 from bluelock.signal_processor import NO_SIGNAL
 
@@ -32,9 +33,9 @@ class ProximityStateMachine:
     def __init__(
         self,
         lock_rssi_threshold: int = -15,
-        lock_duration: int = 6,
+        lock_duration: float = 6.0,
         unlock_rssi_threshold: int = -10,
-        unlock_duration: int = 1,
+        unlock_duration: float = 1.0,
     ) -> None:
         self.lock_rssi_threshold = lock_rssi_threshold
         self.lock_duration = lock_duration
@@ -42,7 +43,7 @@ class ProximityStateMachine:
         self.unlock_duration = unlock_duration
 
         self._state = ProximityState.UNKNOWN
-        self._duration_counter = 0
+        self._last_met_time = 0.0
 
     @property
     def state(self) -> ProximityState:
@@ -50,8 +51,8 @@ class ProximityStateMachine:
 
     @property
     def lock_pending(self) -> bool:
-        """True while in ACTIVE state and the lock duration counter is running."""
-        return self._state == ProximityState.ACTIVE and self._duration_counter > 0
+        """True while in ACTIVE state and the lock condition is met but duration hasn't elapsed."""
+        return self._state == ProximityState.ACTIVE and self._last_met_time > 0
 
     def evaluate(
         self, smoothed_rssi: float, device_present: bool
@@ -90,41 +91,49 @@ class ProximityStateMachine:
         """Check if we should transition from ACTIVE to GONE."""
         should_lock = not device_present or effective_rssi <= self.lock_rssi_threshold
         if should_lock:
-            self._duration_counter += 1
-            log.debug("Lock condition met (%d/%d): RSSI=%.1f present=%s",
-                      self._duration_counter, self.lock_duration, effective_rssi, device_present)
-            if self._duration_counter >= self.lock_duration:
+            now = time.monotonic()
+            if self._last_met_time == 0:
+                self._last_met_time = now
+
+            elapsed = now - self._last_met_time
+            log.debug("Lock condition met (%.1fs/%.1fs): RSSI=%.1f present=%s",
+                      elapsed, self.lock_duration, effective_rssi, device_present)
+            if elapsed >= self.lock_duration:
                 self._transition(ProximityState.GONE)
-                log.info("→ GONE (RSSI=%.1f, duration=%d)", effective_rssi, self._duration_counter)
+                log.info("→ GONE (RSSI=%.1f, elapsed=%.1fs)", effective_rssi, elapsed)
                 return ProximityState.GONE
         else:
-            if self._duration_counter > 0:
+            if self._last_met_time > 0:
                 log.debug("Lock condition reset (RSSI=%.1f)", effective_rssi)
-            self._duration_counter = 0
+            self._last_met_time = 0.0
         return None
 
     def _handle_gone(self, effective_rssi: float, device_present: bool) -> ProximityState | None:
         """Check if we should transition from GONE to ACTIVE."""
         should_unlock = device_present and effective_rssi >= self.unlock_rssi_threshold
         if should_unlock:
-            self._duration_counter += 1
-            log.debug("Unlock condition met (%d/%d): RSSI=%.1f present=%s",
-                      self._duration_counter, self.unlock_duration, effective_rssi, device_present)
-            if self._duration_counter >= self.unlock_duration:
+            now = time.monotonic()
+            if self._last_met_time == 0:
+                self._last_met_time = now
+
+            elapsed = now - self._last_met_time
+            log.debug("Unlock condition met (%.1fs/%.1fs): RSSI=%.1f present=%s",
+                      elapsed, self.unlock_duration, effective_rssi, device_present)
+            if elapsed >= self.unlock_duration:
                 self._transition(ProximityState.ACTIVE)
-                log.info("→ ACTIVE (RSSI=%.1f, duration=%d)", effective_rssi, self._duration_counter)
+                log.info("→ ACTIVE (RSSI=%.1f, elapsed=%.1fs)", effective_rssi, elapsed)
                 return ProximityState.ACTIVE
         else:
-            if self._duration_counter > 0:
+            if self._last_met_time > 0:
                 log.debug("Unlock condition reset (RSSI=%.1f)", effective_rssi)
-            self._duration_counter = 0
+            self._last_met_time = 0.0
         return None
 
     def _transition(self, new_state: ProximityState) -> None:
         self._state = new_state
-        self._duration_counter = 0
+        self._last_met_time = 0.0
 
     def reset(self) -> None:
         """Reset to UNKNOWN state."""
         self._state = ProximityState.UNKNOWN
-        self._duration_counter = 0
+        self._last_met_time = 0.0

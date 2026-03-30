@@ -165,6 +165,8 @@ class BluezDBusMonitor(AbstractBluetoothMonitor):
             if "InProgress" not in err:
                 log.warning("StartDiscovery failed: %s", err)
                 self.error_occurred.emit(f"Bluetooth discovery error: {err}")
+            else:
+                log.debug("StartDiscovery: Operation already in progress")
 
     def _stop_discovery(self) -> None:
         adapter = QDBusInterface(_BLUEZ_SVC, self._adapter_path, _BLUEZ_ADAPTER_IFACE, self._bus)

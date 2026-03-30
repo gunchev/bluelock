@@ -6,7 +6,7 @@ from bluelock.config import Config, DeviceConfig, _to_toml
 class TestConfigDefaults:
     def test_default_values(self):
         c = Config()
-        assert c.devices == []
+        assert c.device is None
         assert c.device_mac == ""
         assert c.device_name == ""
         assert c.lock_rssi_threshold == -15
@@ -22,7 +22,7 @@ class TestConfigDefaults:
 class TestConfigLoadSave:
     def test_round_trip(self, tmp_config_path):
         c = Config(
-            devices=[DeviceConfig(
+            device=DeviceConfig(
                 mac="AA:BB:CC:DD:EE:FF",
                 name="My Phone",
                 lock_rssi_threshold=-20,
@@ -31,7 +31,7 @@ class TestConfigLoadSave:
                 unlock_duration=2,
                 lock_command="loginctl lock-session",
                 unlock_command="",
-            )],
+            ),
             buffer_size=8,
             scan_interval=2.0,
         )
@@ -71,7 +71,7 @@ class TestConfigLoadSave:
         assert path.exists()
 
     def test_empty_string_commands(self, tmp_config_path):
-        c = Config(devices=[DeviceConfig(mac="AA:BB:CC:DD:EE:FF", lock_command="", unlock_command="")])
+        c = Config(device=DeviceConfig(mac="AA:BB:CC:DD:EE:FF", lock_command="", unlock_command=""))
         c.save(tmp_config_path)
         loaded = Config.load(tmp_config_path)
         assert loaded.lock_command == ""
@@ -79,7 +79,7 @@ class TestConfigLoadSave:
 
     def test_command_with_special_chars(self, tmp_config_path):
         cmd = 'dbus-send --session --dest=org.gnome.ScreenSaver "/path" bool:true'
-        c = Config(devices=[DeviceConfig(mac="AA:BB:CC:DD:EE:FF", lock_command=cmd)])
+        c = Config(device=DeviceConfig(mac="AA:BB:CC:DD:EE:FF", lock_command=cmd))
         c.save(tmp_config_path)
         loaded = Config.load(tmp_config_path)
         assert loaded.lock_command == cmd
@@ -87,13 +87,13 @@ class TestConfigLoadSave:
 
 class TestToToml:
     def test_string_values(self):
-        c = Config(devices=[DeviceConfig(mac="00:11:22", name="N")])
+        c = Config(device=DeviceConfig(mac="00:11:22", name="N"))
         result = _to_toml(c)
         assert 'mac = "00:11:22"' in result
         assert 'name = "N"' in result
 
     def test_int_values(self):
-        c = Config(devices=[DeviceConfig(mac="00:11:22", lock_rssi_threshold=-42)])
+        c = Config(device=DeviceConfig(mac="00:11:22", lock_rssi_threshold=-42))
         result = _to_toml(c)
         assert "lock_rssi = -42" in result
 
@@ -107,12 +107,12 @@ class TestToToml:
         pass
 
     def test_string_with_quotes_escaped(self):
-        c = Config(devices=[DeviceConfig(mac="00:11:22", name='say "hello"')])
+        c = Config(device=DeviceConfig(mac="00:11:22", name='say "hello"'))
         result = _to_toml(c)
         assert r'say \"hello\"' in result
 
     def test_sections_separated_by_blank_line(self):
-        c = Config(devices=[DeviceConfig(mac="00:11:22")])
+        c = Config(device=DeviceConfig(mac="00:11:22"))
         result = _to_toml(c)
         lines = result.splitlines()
         # Find the blank line between sections

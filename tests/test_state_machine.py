@@ -1,5 +1,6 @@
 """Tests for bluelock.state_machine."""
 import pytest
+import time
 from bluelock.state_machine import ProximityState, ProximityStateMachine
 
 
@@ -8,13 +9,24 @@ UNLOCK_RSSI = -10
 
 
 @pytest.fixture
-def sm():
-    return ProximityStateMachine(
+def sm(monkeypatch):
+    # Fix monotonic time for predictable tests
+    current_time = [100.0]
+    def mock_monotonic():
+        return current_time[0]
+    monkeypatch.setattr(time, "monotonic", mock_monotonic)
+
+    sm = ProximityStateMachine(
         lock_rssi_threshold=LOCK_RSSI,
-        lock_duration=3,
+        lock_duration=3.0,
         unlock_rssi_threshold=UNLOCK_RSSI,
-        unlock_duration=2,
+        unlock_duration=2.0,
     )
+    # Add a helper to advance time
+    def advance(seconds):
+        current_time[0] += seconds
+    sm.advance = advance
+    return sm
 
 
 class TestInitialState:
@@ -43,75 +55,87 @@ class TestInitialState:
 class TestActiveToGone:
     def test_weak_signal_for_duration_locks(self, sm):
         sm.evaluate(-5, True)   # → ACTIVE
-        assert sm.evaluate(-20, True) is None    # 1st
-        assert sm.evaluate(-20, True) is None    # 2nd
-        result = sm.evaluate(-20, True)           # 3rd (lock_duration=3)
+        assert sm.evaluate(-20, True) is None    # 0s elapsed
+        sm.advance(1.5)
+        assert sm.evaluate(-20, True) is None    # 1.5s elapsed
+        sm.advance(1.5)
+        result = sm.evaluate(-20, True)           # 3.0s elapsed (lock_duration=3)
         assert result == ProximityState.GONE
 
     def test_absent_device_counts_toward_lock(self, sm):
         sm.evaluate(-5, True)   # → ACTIVE
         assert sm.evaluate(-80, False) is None
-        assert sm.evaluate(-80, False) is None
+        sm.advance(3.0)
         result = sm.evaluate(-80, False)
         assert result == ProximityState.GONE
 
     def test_signal_recovery_resets_counter(self, sm):
         sm.evaluate(-5, True)   # → ACTIVE
-        sm.evaluate(-20, True)  # 1st below lock threshold
-        sm.evaluate(-20, True)  # 2nd
-        sm.evaluate(-5, True)   # signal recovers — counter resets
-        assert sm.evaluate(-20, True) is None  # counter starts fresh
-        assert sm.evaluate(-20, True) is None
-        result = sm.evaluate(-20, True)        # 3rd
+        sm.evaluate(-20, True)  # start timer
+        sm.advance(2.0)
+        sm.evaluate(-5, True)   # signal recovers — timer resets
+        sm.advance(1.0)
+        assert sm.evaluate(-20, True) is None  # timer starts fresh
+        sm.advance(3.0)
+        result = sm.evaluate(-20, True)        # 3.0s total below threshold
         assert result == ProximityState.GONE
 
     def test_stays_active_if_threshold_not_met(self, sm):
         sm.evaluate(-5, True)   # → ACTIVE
         for _ in range(10):
+            sm.advance(1.0)
             result = sm.evaluate(-12, True)  # above lock threshold (-15)
             assert result is None
         assert sm.state == ProximityState.ACTIVE
 
     def test_exactly_at_lock_threshold_triggers(self, sm):
         sm.evaluate(-5, True)   # → ACTIVE
-        for _ in range(3):
-            sm.evaluate(LOCK_RSSI, True)  # exactly at threshold
+        sm.evaluate(LOCK_RSSI, True)  # start timer
+        sm.advance(3.0)
+        sm.evaluate(LOCK_RSSI, True)
         assert sm.state == ProximityState.GONE
 
 
 class TestGoneToActive:
     def test_strong_signal_for_duration_unlocks(self, sm):
         sm.evaluate(-80, True)  # → GONE
-        assert sm.evaluate(-5, True) is None     # 1st (unlock_duration=2)
+        assert sm.evaluate(-5, True) is None     # start timer (unlock_duration=2)
+        sm.advance(2.0)
         result = sm.evaluate(-5, True)            # 2nd
         assert result == ProximityState.ACTIVE
 
     def test_signal_drop_resets_unlock_counter(self, sm):
         sm.evaluate(-80, True)  # → GONE
-        sm.evaluate(-5, True)   # 1st unlock count
+        sm.evaluate(-5, True)   # start timer
+        sm.advance(1.0)
         sm.evaluate(-80, True)  # signal drops — resets
-        assert sm.evaluate(-5, True) is None  # counter starts fresh
-        result = sm.evaluate(-5, True)         # 2nd
+        sm.advance(1.0)
+        assert sm.evaluate(-5, True) is None  # timer starts fresh
+        sm.advance(2.0)
+        result = sm.evaluate(-5, True)         # 2.0s
         assert result == ProximityState.ACTIVE
 
     def test_absent_device_does_not_unlock(self, sm):
         sm.evaluate(-80, True)  # → GONE
-        for _ in range(5):
-            result = sm.evaluate(-5, False)  # strong RSSI but not present
-            assert result is None
+        sm.evaluate(-5, False)  # strong RSSI but not present
+        sm.advance(5.0)
+        result = sm.evaluate(-5, False)
+        assert result is None
         assert sm.state == ProximityState.GONE
 
     def test_stays_gone_if_threshold_not_met(self, sm):
         sm.evaluate(-80, True)  # → GONE
         for _ in range(10):
+            sm.advance(1.0)
             result = sm.evaluate(-12, True)  # below unlock threshold (-10)
             assert result is None
         assert sm.state == ProximityState.GONE
 
     def test_exactly_at_unlock_threshold_triggers(self, sm):
         sm.evaluate(-80, True)  # → GONE
-        for _ in range(2):
-            sm.evaluate(UNLOCK_RSSI, True)
+        sm.evaluate(UNLOCK_RSSI, True)
+        sm.advance(2.0)
+        sm.evaluate(UNLOCK_RSSI, True)
         assert sm.state == ProximityState.ACTIVE
 
 

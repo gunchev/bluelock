@@ -24,51 +24,48 @@ class DeviceConfig:
 class Config:
     """BlueLock configuration.
 
-    ``devices`` holds up to four DeviceConfig entries; devices[0] is the
-    primary device that is currently monitored.  The shim properties below
-    delegate to devices[0] so that the rest of the app (app.py, session_locker)
-    does not need to know about the list.
+    ``device`` holds the proximity configuration for the monitored Bluetooth device.
     """
 
-    devices: list[DeviceConfig] = dataclasses.field(default_factory=list)
+    device: DeviceConfig | None = None
     buffer_size: int = 16
     scan_interval: float = 1.0
 
     # ------------------------------------------------------------------
-    # Shims — delegate to devices[0] so app.py needs no changes
+    # Properties for easy access to device settings
     # ------------------------------------------------------------------
 
     @property
     def device_mac(self) -> str:
-        return self.devices[0].mac if self.devices else ""
+        return self.device.mac if self.device else ""
 
     @property
     def device_name(self) -> str:
-        return self.devices[0].name if self.devices else ""
+        return self.device.name if self.device else ""
 
     @property
     def lock_rssi_threshold(self) -> int:
-        return self.devices[0].lock_rssi_threshold if self.devices else -15
+        return self.device.lock_rssi_threshold if self.device else -15
 
     @property
     def lock_duration(self) -> int:
-        return self.devices[0].lock_duration if self.devices else 4
+        return self.device.lock_duration if self.device else 4
 
     @property
     def unlock_rssi_threshold(self) -> int:
-        return self.devices[0].unlock_rssi_threshold if self.devices else -10
+        return self.device.unlock_rssi_threshold if self.device else -10
 
     @property
     def unlock_duration(self) -> int:
-        return self.devices[0].unlock_duration if self.devices else 4
+        return self.device.unlock_duration if self.device else 4
 
     @property
     def lock_command(self) -> str:
-        return self.devices[0].lock_command if self.devices else ""
+        return self.device.lock_command if self.device else ""
 
     @property
     def unlock_command(self) -> str:
-        return self.devices[0].unlock_command if self.devices else ""
+        return self.device.unlock_command if self.device else ""
 
     # ------------------------------------------------------------------
     # Paths
@@ -108,8 +105,10 @@ class Config:
         )
 
         # New format: [[devices]] array of tables
-        for d in data.get("devices", []):
-            cfg.devices.append(DeviceConfig(
+        devices = data.get("devices", [])
+        if devices:
+            d = devices[0]
+            cfg.device = DeviceConfig(
                 mac=str(d.get("mac", "")),
                 name=str(d.get("name", "")),
                 lock_rssi_threshold=int(d.get("lock_rssi", -15)),
@@ -118,16 +117,16 @@ class Config:
                 unlock_duration=int(d.get("unlock_duration", 4)),
                 lock_command=str(d.get("lock_command", "")),
                 unlock_command=str(d.get("unlock_command", "")),
-            ))
+            )
 
         # Backward compat: old [device] / [thresholds] / [commands] sections
-        if not cfg.devices:
+        if not cfg.device:
             device = data.get("device", {})
             thresholds = data.get("thresholds", {})
             commands = data.get("commands", {})
             mac = str(device.get("mac", ""))
             if mac:
-                cfg.devices.append(DeviceConfig(
+                cfg.device = DeviceConfig(
                     mac=mac,
                     name=str(device.get("name", "")),
                     lock_rssi_threshold=int(thresholds.get("lock_rssi", -15)),
@@ -136,7 +135,7 @@ class Config:
                     unlock_duration=int(thresholds.get("unlock_duration", 4)),
                     lock_command=str(commands.get("lock", "")),
                     unlock_command=str(commands.get("unlock", "")),
-                ))
+                )
 
         return cfg
 
@@ -153,7 +152,7 @@ def _escape(s: str) -> str:
 
 
 def _to_toml(cfg: Config) -> str:
-    """Serialize Config to TOML with [[devices]] array-of-tables."""
+    """Serialize Config to TOML."""
     lines: list[str] = []
 
     lines.append("[advanced]")
@@ -161,16 +160,16 @@ def _to_toml(cfg: Config) -> str:
     lines.append(f"scan_interval = {cfg.scan_interval!r}")
     lines.append("")
 
-    for dev in cfg.devices:
+    if cfg.device:
         lines.append("[[devices]]")
-        lines.append(f'mac = "{_escape(dev.mac)}"')
-        lines.append(f'name = "{_escape(dev.name)}"')
-        lines.append(f"lock_rssi = {dev.lock_rssi_threshold}")
-        lines.append(f"lock_duration = {dev.lock_duration}")
-        lines.append(f"unlock_rssi = {dev.unlock_rssi_threshold}")
-        lines.append(f"unlock_duration = {dev.unlock_duration}")
-        lines.append(f'lock_command = "{_escape(dev.lock_command)}"')
-        lines.append(f'unlock_command = "{_escape(dev.unlock_command)}"')
+        lines.append(f'mac = "{_escape(cfg.device.mac)}"')
+        lines.append(f'name = "{_escape(cfg.device.name)}"')
+        lines.append(f"lock_rssi = {cfg.device.lock_rssi_threshold}")
+        lines.append(f"lock_duration = {cfg.device.lock_duration}")
+        lines.append(f"unlock_rssi = {cfg.device.unlock_rssi_threshold}")
+        lines.append(f"unlock_duration = {cfg.device.unlock_duration}")
+        lines.append(f'lock_command = "{_escape(cfg.device.lock_command)}"')
+        lines.append(f'unlock_command = "{_escape(cfg.device.unlock_command)}"')
         lines.append("")
 
     return "\n".join(lines)
