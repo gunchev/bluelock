@@ -81,7 +81,7 @@ class _DeviceTab(QWidget):
 
     forget_requested = pyqtSignal(str)  # emits MAC address
 
-    def __init__(self, dev: DeviceConfig, buffer_size: int = 16, scan_interval: float = 1.0, parent=None) -> None:
+    def __init__(self, dev: DeviceConfig, buffer_size: int = 16, scan_interval: float = 1.0, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._mac = dev.mac
         self._name = dev.name
@@ -238,7 +238,7 @@ class _DeviceTab(QWidget):
 class ConfigDialog(QDialog):
     """Configuration dialog."""
 
-    def __init__(self, config: Config, parent=None) -> None:
+    def __init__(self, config: Config, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setWindowTitle("BlueLock — Preferences")
         self.setMinimumSize(720, 690)
