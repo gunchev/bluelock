@@ -285,7 +285,7 @@ class ConfigDialog(QDialog):
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
         self._tabs = QTabWidget()
-        self._tabs.addTab(self._build_scanner_tab(), "Device")
+        self._tabs.addTab(self._build_scanner_tab(), "Devices")
         layout.addWidget(self._tabs)
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         buttons.accepted.connect(self._on_accept)
@@ -332,7 +332,7 @@ class ConfigDialog(QDialog):
         tab = _DeviceTab(dev, buffer_size, scan_interval)
         tab.forget_requested.connect(self._on_forget)
         self._device_tabs[dev.mac] = tab
-        idx = self._tabs.addTab(tab, dev.mac)
+        idx = self._tabs.addTab(tab, "Settings")
         self._tabs.setTabEnabled(0, False)
         return idx
 
