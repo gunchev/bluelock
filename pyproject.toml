@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "bluelock"
-version = "0.2.0"
+version = "0.3.0"
 description = "Lock and unlock your KDE session based on Bluetooth device proximity."
 readme = "README.md"
 license = "Unlicense"

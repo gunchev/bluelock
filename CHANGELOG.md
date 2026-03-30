@@ -1,3 +1,22 @@
+## 0.3.0 — 2026-03-30
+
+### Changes since v0.2.0
+
+- 7d7ee02 Apply pending changes before release
+- 8d9ff06 Update PROMPT.md with latest prompts
+- a276aa7 Add type hints to ConfigDialog and _DeviceTab
+- 9a204c6 Update tests to match new D-Bus unlock and Config structure
+- ba1b2d2 Refactor src/bluelock/mon.py to use the shared monitoring logic
+- e5c29b1 Unify icon resources and configure hatchling shared-data
+- 9b65e33 Consolidate RSSI polling logic and optimize fallback polling
+- 3873a59 Refactor SessionLocker._dbus_unlock to use GetSessionByPID
+- 408bc76 Update PROMPT.md with prompts 38-43
+- ee8c698 Rename dialog tabs to "Devices" and "Settings"
+- 15f0332 Move Advanced settings to device tab; disable autostart without device
+- 9c78bce Single device: lock Device tab when configured, unlock on Forget
+- e9ea6de Fix RSSI display: only update the monitored device's tab
+- 1ebb46c Multi-device config: per-device tabs named by MAC, up to 4 devices
+
 ## 0.1.0 — 2026-03-29
 
 ### Changes since v0.0.2
