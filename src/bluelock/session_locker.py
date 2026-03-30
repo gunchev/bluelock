@@ -134,56 +134,46 @@ class SessionLocker:
 class ScreenSaverInhibitor:
     """Prevents the screensaver / idle-lock while a Bluetooth device is nearby.
 
-    Calls org.freedesktop.ScreenSaver.Inhibit on the session bus and holds the
-    returned cookie until uninhibit() is called.  Safe to call multiple times.
+    Periodically calls org.freedesktop.ScreenSaver.SimulateUserActivity() to
+    reset the idle timer instead of using Inhibit/UnInhibit cookies.  KDE does
+    not implement UnInhibit with the correct uint32 signature, so the cookie
+    approach leaves stale inhibitions that interfere with lock/unlock cycles.
+    SimulateUserActivity works on KDE, GNOME and all other freedesktop desktops.
     """
 
-    _APP_NAME = "BlueLock"
-    _REASON = "Bluetooth device is nearby"
+    _INTERVAL_MS = 30_000  # reset idle timer every 30 s
 
     def __init__(self) -> None:
-        self._cookie: int | None = None
+        from PyQt6.QtCore import QTimer
+        self._timer = QTimer()
+        self._timer.setInterval(self._INTERVAL_MS)
+        self._timer.timeout.connect(self._simulate)
 
     @property
     def active(self) -> bool:
-        return self._cookie is not None
+        return self._timer.isActive()
 
     def inhibit(self) -> None:
-        """Acquire an inhibit lock (no-op if already held)."""
-        if self._cookie is not None:
+        """Start resetting the idle timer periodically (no-op if already running)."""
+        if self._timer.isActive():
             return
+        self._simulate()          # immediate reset so effect is instant
+        self._timer.start()
+        log.info("Screensaver idle-reset started (every %ds)", self._INTERVAL_MS // 1000)
+
+    def uninhibit(self) -> None:
+        """Stop resetting the idle timer (no-op if not running)."""
+        if not self._timer.isActive():
+            return
+        self._timer.stop()
+        log.info("Screensaver idle-reset stopped")
+
+    def _simulate(self) -> None:
         try:
             from PyQt6.QtDBus import QDBusConnection, QDBusMessage
             bus = QDBusConnection.sessionBus()
-            msg = QDBusMessage.createMethodCall(_SS_SVC, _SS_PATH, _SS_SVC, "Inhibit")
-            msg.setArguments([self._APP_NAME, self._REASON])
-            reply = bus.call(msg)
-            if reply.type() == QDBusMessage.MessageType.ErrorMessage:
-                log.warning("ScreenSaver.Inhibit failed: %s", reply.errorMessage())
-                return
-            args = reply.arguments()
-            self._cookie = int(args[0]) if args else None
-            log.info("Screensaver inhibited (cookie=%s)", self._cookie)
+            msg = QDBusMessage.createMethodCall(_SS_SVC, _SS_PATH, _SS_SVC, "SimulateUserActivity")
+            bus.call(msg)
+            log.debug("SimulateUserActivity sent")
         except Exception as exc:  # noqa: BLE001
-            log.warning("ScreenSaver.Inhibit error: %s", exc)
-
-    def uninhibit(self) -> None:
-        """Release the inhibit lock (no-op if not held)."""
-        if self._cookie is None:
-            return
-        try:
-            from PyQt6.QtDBus import QDBusConnection, QDBusInterface, QDBusMessage
-            bus = QDBusConnection.sessionBus()
-            # Use QDBusInterface so Qt introspects the remote object and coerces
-            # the Python int cookie to the declared uint32 ('u') type — passing it
-            # via QDBusMessage.setArguments sends int32 ('i') which KDE rejects.
-            iface = QDBusInterface(_SS_SVC, _SS_PATH, _SS_SVC, bus)
-            reply = iface.call("UnInhibit", self._cookie)
-            if reply.type() == QDBusMessage.MessageType.ErrorMessage:
-                log.warning("ScreenSaver.UnInhibit failed: %s", reply.errorMessage())
-            else:
-                log.info("Screensaver uninhibited (cookie=%s)", self._cookie)
-        except Exception as exc:  # noqa: BLE001
-            log.warning("ScreenSaver.UnInhibit error: %s", exc)
-        finally:
-            self._cookie = None
+            log.warning("SimulateUserActivity failed: %s", exc)
