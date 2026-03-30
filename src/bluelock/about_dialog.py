@@ -10,7 +10,7 @@ _ABOUT_TEXT = f"""<h2>BlueLock {__version__}</h2>
 <p>Lock and unlock your KDE session based on Bluetooth device proximity.</p>
 <p>Author: {__author__}<br>
 License: {__license__}</p>
-<p>Developed with assistance from Claude and Junnie (AI assistants).</p>
+<p>Developed with assistance from Claude and Junie (AI assistants).</p>
 <p>Monitors a paired Bluetooth device's signal strength. When the device
 moves out of range, the session is locked automatically. When it returns,
 the session is unlocked.</p>
@@ -21,7 +21,7 @@ class AboutDialog(QDialog):
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self.setWindowTitle("About BlueLock")
-        self.setMinimumWidth(380)
+        self.setMinimumWidth(420)
 
         layout = QVBoxLayout(self)
 
