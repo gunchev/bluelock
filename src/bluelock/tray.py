@@ -12,10 +12,10 @@ from bluelock.state_machine import ProximityState
 
 log = logging.getLogger(__name__)
 
-# In dev mode, icons are in resources/icons relative to the project root.
-# In installed mode, hatchling places them in bluelock/icons (site-packages).
-_DEV_ICONS_DIR = Path(__file__).parents[2] / "resources" / "icons"
-_INSTALLED_ICONS_DIR = Path(__file__).parent / "icons"
+# Icons live alongside this module: src/bluelock/icons/ (dev) or
+# {site-packages}/bluelock/icons/ (installed).  Both resolve to the same
+# relative path because uv run uses an editable install.
+_ICONS_DIR = Path(__file__).parent / "icons"
 
 _ICON_FILES: dict[str, str] = {
     "close":  "bluelock_close.svg",
@@ -29,16 +29,11 @@ _ICON_FILES: dict[str, str] = {
 def _load_icons() -> dict[str, QIcon]:
     icons = {}
     for key, filename in _ICON_FILES.items():
-        # 1. Try dev path
-        path = _DEV_ICONS_DIR / filename
-        if not path.exists():
-            # 2. Try installed path
-            path = _INSTALLED_ICONS_DIR / filename
-
+        path = _ICONS_DIR / filename
         if path.exists():
             icons[key] = QIcon(str(path))
         else:
-            log.warning("Icon not found: %s", filename)
+            log.warning("Icon not found: %s", path)
             icons[key] = QIcon()  # blank fallback
     return icons
 

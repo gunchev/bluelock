@@ -54,9 +54,6 @@ Repository = "https://github.com/gunchev/bluelock"
 [tool.hatch.build.targets.wheel]
 packages = ["src/bluelock"]
 
-[tool.hatch.build.targets.wheel.shared-data]
-"resources/icons" = "bluelock/icons"
-
 [tool.ruff]
 src = ["src"]
 line-length = 120

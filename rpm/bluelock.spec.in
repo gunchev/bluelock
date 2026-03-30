@@ -17,6 +17,7 @@ BuildRequires:  desktop-file-utils
 
 Requires:       python3
 Requires:       python3-pyqt6-base
+Requires:       python3-dbus
 Requires:       bluez
 Requires:       sudo
 
@@ -55,7 +56,6 @@ desktop-file-validate %{buildroot}%{_datadir}/applications/%{name}.desktop
 %{_bindir}/%{name}_mon
 %{_datadir}/applications/%{name}.desktop
 %{_datadir}/icons/hicolor/scalable/apps/%{name}.svg
-%{_prefix}/bluelock/icons/*.svg
 %config(noreplace) %{_sysconfdir}/sudoers.d/%{name}
 
 %changelog

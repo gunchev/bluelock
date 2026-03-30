@@ -191,6 +191,9 @@ class BlueLockApp:
         self._app.quit()
 
 
+_DBUS_SERVICE = "org.bluelock.App"
+
+
 def main() -> None:
     """Application entry point."""
     import signal
@@ -201,6 +204,14 @@ def main() -> None:
     app = QApplication(sys.argv)
     app.setApplicationName("BlueLock")
     app.setQuitOnLastWindowClosed(False)   # keep running after dialogs close
+
+    # Single-instance guard: register a unique D-Bus name.
+    # If it fails the name is already owned — another instance is running.
+    from PyQt6.QtDBus import QDBusConnection
+    bus = QDBusConnection.sessionBus()
+    if not bus.registerService(_DBUS_SERVICE):
+        print("BlueLock is already running.", file=sys.stderr)
+        sys.exit(0)
 
     # Qt's C++ event loop never yields to Python, so SIGINT would be ignored.
     # Install a handler that calls quit(), and a timer that wakes Python periodically
