@@ -1,3 +1,11 @@
+## 0.3.2 — 2026-03-31
+
+### Changes since v0.3.1
+
+- d0493d3 Remove redundant resources/icons/ directory
+- 7ce9918 Fix RPM icon loading and add single-instance guard
+- 9729549 Start 0.3.2-dev
+
 ## 0.3.1 — 2026-03-31
 
 ### Changes since v0.3.0
