@@ -172,11 +172,13 @@ class ScreenSaverInhibitor:
         if self._cookie is None:
             return
         try:
-            from PyQt6.QtDBus import QDBusConnection, QDBusMessage
+            from PyQt6.QtDBus import QDBusConnection, QDBusInterface, QDBusMessage
             bus = QDBusConnection.sessionBus()
-            msg = QDBusMessage.createMethodCall(_SS_SVC, _SS_PATH, _SS_SVC, "UnInhibit")
-            msg.setArguments([self._cookie])
-            reply = bus.call(msg)
+            # Use QDBusInterface so Qt introspects the remote object and coerces
+            # the Python int cookie to the declared uint32 ('u') type — passing it
+            # via QDBusMessage.setArguments sends int32 ('i') which KDE rejects.
+            iface = QDBusInterface(_SS_SVC, _SS_PATH, _SS_SVC, bus)
+            reply = iface.call("UnInhibit", self._cookie)
             if reply.type() == QDBusMessage.MessageType.ErrorMessage:
                 log.warning("ScreenSaver.UnInhibit failed: %s", reply.errorMessage())
             else:
