@@ -344,7 +344,8 @@ class ConfigDialog(QDialog):
     # ------------------------------------------------------------------ #
 
     def _on_rssi_update(self, rssi: int) -> None:
-        for tab in self._device_tabs.values():
+        tab = self._device_tabs.get(self._config.device_mac)
+        if tab:
             tab.update_rssi(rssi)
 
     def _on_scan_clicked(self) -> None:
