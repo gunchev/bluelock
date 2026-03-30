@@ -83,18 +83,40 @@ class TestDbusLock:
 
     def test_dbus_unlock_calls_login1_unlock(self, mocker):
         try:
-            from PyQt6.QtDBus import QDBusConnection
+            from PyQt6.QtDBus import QDBusConnection, QDBusMessage
         except ImportError:
             pytest.skip("PyQt6.QtDBus not available")
-        mock_bus = self._make_mock_bus()
+
+        # 1. Mock the Manager response
+        manager_reply = MagicMock()
+        manager_reply.type.return_value = QDBusMessage.MessageType.ReplyMessage
+        manager_reply.arguments.return_value = ["/org/freedesktop/login1/session/3"]
+
+        # 2. Mock the Session response
+        session_reply = MagicMock()
+        session_reply.type.return_value = QDBusMessage.MessageType.ReplyMessage
+
+        mock_bus = MagicMock()
+        mock_bus.call.side_effect = [manager_reply, session_reply]
+
         mocker.patch("PyQt6.QtDBus.QDBusConnection.systemBus", return_value=mock_bus)
-        mocker.patch.dict("os.environ", {"XDG_SESSION_ID": "3"})
+        mocker.patch("os.getpid", return_value=1234)
+
         locker = SessionLocker()
         locker.unlock()
-        mock_bus.call.assert_called_once()
-        msg_arg = mock_bus.call.call_args[0][0]
-        assert msg_arg.member() == "Unlock"
-        assert msg_arg.path() == "/org/freedesktop/login1/session/3"
+
+        assert mock_bus.call.call_count == 2
+        calls = mock_bus.call.call_args_list
+
+        # First call should be GetSessionByPID
+        msg_1 = calls[0][0][0]
+        assert msg_1.member() == "GetSessionByPID"
+        assert msg_1.arguments() == [1234]
+
+        # Second call should be Unlock on the returned path
+        msg_2 = calls[1][0][0]
+        assert msg_2.member() == "Unlock"
+        assert msg_2.path() == "/org/freedesktop/login1/session/3"
 
     def test_dbus_error_raises_lock_error(self, mocker):
         try:

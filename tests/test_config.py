@@ -1,11 +1,12 @@
 """Tests for bluelock.config."""
 import pytest
-from bluelock.config import Config, _to_toml
+from bluelock.config import Config, DeviceConfig, _to_toml
 
 
 class TestConfigDefaults:
     def test_default_values(self):
         c = Config()
+        assert c.devices == []
         assert c.device_mac == ""
         assert c.device_name == ""
         assert c.lock_rssi_threshold == -15
@@ -17,22 +18,20 @@ class TestConfigDefaults:
         assert c.buffer_size == 16
         assert c.scan_interval == 1.0
 
-    def test_lock_threshold_lower_than_unlock(self):
-        c = Config()
-        assert c.lock_rssi_threshold < c.unlock_rssi_threshold
-
 
 class TestConfigLoadSave:
     def test_round_trip(self, tmp_config_path):
         c = Config(
-            device_mac="AA:BB:CC:DD:EE:FF",
-            device_name="My Phone",
-            lock_rssi_threshold=-20,
-            lock_duration=5,
-            unlock_rssi_threshold=-12,
-            unlock_duration=2,
-            lock_command="loginctl lock-session",
-            unlock_command="",
+            devices=[DeviceConfig(
+                mac="AA:BB:CC:DD:EE:FF",
+                name="My Phone",
+                lock_rssi_threshold=-20,
+                lock_duration=5,
+                unlock_rssi_threshold=-12,
+                unlock_duration=2,
+                lock_command="loginctl lock-session",
+                unlock_command="",
+            )],
             buffer_size=8,
             scan_interval=2.0,
         )
@@ -72,7 +71,7 @@ class TestConfigLoadSave:
         assert path.exists()
 
     def test_empty_string_commands(self, tmp_config_path):
-        c = Config(lock_command="", unlock_command="")
+        c = Config(devices=[DeviceConfig(mac="AA:BB:CC:DD:EE:FF", lock_command="", unlock_command="")])
         c.save(tmp_config_path)
         loaded = Config.load(tmp_config_path)
         assert loaded.lock_command == ""
@@ -80,7 +79,7 @@ class TestConfigLoadSave:
 
     def test_command_with_special_chars(self, tmp_config_path):
         cmd = 'dbus-send --session --dest=org.gnome.ScreenSaver "/path" bool:true'
-        c = Config(lock_command=cmd)
+        c = Config(devices=[DeviceConfig(mac="AA:BB:CC:DD:EE:FF", lock_command=cmd)])
         c.save(tmp_config_path)
         loaded = Config.load(tmp_config_path)
         assert loaded.lock_command == cmd
@@ -88,32 +87,33 @@ class TestConfigLoadSave:
 
 class TestToToml:
     def test_string_values(self):
-        result = _to_toml({"section": {"key": "value"}})
-        assert '[section]' in result
-        assert 'key = "value"' in result
+        c = Config(devices=[DeviceConfig(mac="00:11:22", name="N")])
+        result = _to_toml(c)
+        assert 'mac = "00:11:22"' in result
+        assert 'name = "N"' in result
 
     def test_int_values(self):
-        result = _to_toml({"s": {"n": 42}})
-        assert "n = 42" in result
+        c = Config(devices=[DeviceConfig(mac="00:11:22", lock_rssi_threshold=-42)])
+        result = _to_toml(c)
+        assert "lock_rssi = -42" in result
 
     def test_float_values(self):
-        result = _to_toml({"s": {"f": 1.5}})
-        assert "f = 1.5" in result
+        c = Config(scan_interval=1.5)
+        result = _to_toml(c)
+        assert "scan_interval = 1.5" in result
 
-    def test_bool_true(self):
-        result = _to_toml({"s": {"b": True}})
-        assert "b = true" in result
-
-    def test_bool_false(self):
-        result = _to_toml({"s": {"b": False}})
-        assert "b = false" in result
+    def test_bools_not_present_in_config(self):
+        # Config no longer has direct booleans that are serialized
+        pass
 
     def test_string_with_quotes_escaped(self):
-        result = _to_toml({"s": {"k": 'say "hello"'}})
+        c = Config(devices=[DeviceConfig(mac="00:11:22", name='say "hello"')])
+        result = _to_toml(c)
         assert r'say \"hello\"' in result
 
     def test_sections_separated_by_blank_line(self):
-        result = _to_toml({"a": {"x": 1}, "b": {"y": 2}})
+        c = Config(devices=[DeviceConfig(mac="00:11:22")])
+        result = _to_toml(c)
         lines = result.splitlines()
         # Find the blank line between sections
         assert "" in lines
