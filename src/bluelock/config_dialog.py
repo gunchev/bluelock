@@ -43,7 +43,6 @@ Icon=bluelock
 Comment=Lock and unlock your session based on Bluetooth proximity
 X-GNOME-Autostart-enabled=true
 """
-_MAX_DEVICES = 4
 _RSSI_MIN = -100
 _RSSI_MAX = 0
 
@@ -320,16 +319,13 @@ class ConfigDialog(QDialog):
         return box
 
     def _add_device_tab(self, dev: DeviceConfig) -> int:
-        """Create a settings tab for *dev*, register it and return its index."""
+        """Create a settings tab for *dev*, register it, lock the Device tab, and return the index."""
         tab = _DeviceTab(dev)
         tab.forget_requested.connect(self._on_forget)
         self._device_tabs[dev.mac] = tab
         idx = self._tabs.addTab(tab, dev.mac)
-        self._update_use_btn()
+        self._tabs.setTabEnabled(0, False)
         return idx
-
-    def _update_use_btn(self) -> None:
-        self._use_btn.setEnabled(len(self._device_tabs) < _MAX_DEVICES)
 
     # ------------------------------------------------------------------ #
     # Populate / sync                                                      #
@@ -381,7 +377,10 @@ class ConfigDialog(QDialog):
         self.accept()
 
     def _on_device_selected(self) -> None:
-        """Use the selected device: focus its existing tab or create a new one."""
+        """Use the selected device: create its settings tab and lock the Device tab."""
+        if self._device_tabs:
+            return
+
         row = self._device_table.currentRow()
         mac = self._mac_edit.text().strip()
         name = ""
@@ -396,24 +395,16 @@ class ConfigDialog(QDialog):
         if not mac:
             return
 
-        if mac in self._device_tabs:
-            self._tabs.setCurrentIndex(self._tabs.indexOf(self._device_tabs[mac]))
-            return
-
-        if len(self._device_tabs) >= _MAX_DEVICES:
-            return
-
         idx = self._add_device_tab(DeviceConfig(mac=mac, name=name))
         self._tabs.setCurrentIndex(idx)
 
     def _on_forget(self, mac: str) -> None:
-        """Remove the device tab for *mac*."""
+        """Remove the device tab for *mac* and unlock the Device tab."""
         tab = self._device_tabs.pop(mac, None)
         if tab is None:
             return
         idx = self._tabs.indexOf(tab)
         if idx >= 0:
             self._tabs.removeTab(idx)
-        self._update_use_btn()
-        if not self._device_tabs:
-            self._tabs.setCurrentIndex(0)
+        self._tabs.setTabEnabled(0, True)
+        self._tabs.setCurrentIndex(0)
