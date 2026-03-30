@@ -68,16 +68,33 @@ class SessionLocker:
         SetActive(false) on org.freedesktop.ScreenSaver only dismisses the
         screensaver, not a password-locked session.  login1 Session.Unlock()
         is what 'loginctl unlock-session' uses and works on KDE/GNOME/etc.
-
-        The session path is built from $XDG_SESSION_ID (always set on a desktop
-        session) to avoid a GetSessionByPID D-Bus call with tricky uint32 typing.
         """
-        import os
         try:
             from PyQt6.QtDBus import QDBusConnection, QDBusMessage
-            session_id = os.environ.get("XDG_SESSION_ID", "auto")
-            session_path = f"/org/freedesktop/login1/session/{session_id}"
+            import os
+
             bus = QDBusConnection.systemBus()
+
+            # 1. Get the session path for our current PID.
+            # This is more robust than relying on $XDG_SESSION_ID.
+            manager_msg = QDBusMessage.createMethodCall(
+                "org.freedesktop.login1", "/org/freedesktop/login1",
+                "org.freedesktop.login1.Manager", "GetSessionByPID")
+            manager_msg.setArguments([os.getpid()])
+            manager_reply = bus.call(manager_msg)
+
+            if manager_reply.type() == QDBusMessage.MessageType.ErrorMessage:
+                # Fallback to $XDG_SESSION_ID if GetSessionByPID fails
+                session_id = os.environ.get("XDG_SESSION_ID")
+                if not session_id:
+                    raise LockError(f"D-Bus unlock failed: {manager_reply.errorMessage()} "
+                                   f"(and XDG_SESSION_ID is not set)")
+                session_path = f"/org/freedesktop/login1/session/{session_id}"
+                log.debug("GetSessionByPID failed, falling back to XDG_SESSION_ID=%s", session_id)
+            else:
+                session_path = manager_reply.arguments()[0]
+
+            # 2. Call Unlock() on the session object.
             msg = QDBusMessage.createMethodCall(
                 "org.freedesktop.login1", session_path,
                 "org.freedesktop.login1.Session", "Unlock")
