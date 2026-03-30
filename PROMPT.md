@@ -280,3 +280,7 @@ Make a new release 0.3.0. Build the RPM (make rpm) package.
 ## Prompt 50
 
 Add logging to show when switching to polling and dbus and which tool was used. Remember if `sudo btmgmt` or `hcitool` are not available and don't try to run them again and again, once at app start.
+
+## Prompt 51
+
+Add credit to Claude and Junnie in the about dialog.
