@@ -10,10 +10,11 @@ System Settings → Screen Locking while the script sleeps.
 from __future__ import annotations
 
 import sys
+import sysconfig
 import time
 
-# Use system site-packages so dbus-python is found
-sys.path.insert(0, '/usr/lib64/python3.14/site-packages')
+# Use system site-packages so dbus-python is found (not available in the uv venv)
+sys.path.insert(0, sysconfig.get_path('platlib'))
 
 from PyQt6.QtCore import QCoreApplication, QTimer
 

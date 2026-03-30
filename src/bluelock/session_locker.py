@@ -223,7 +223,10 @@ class ScreenSaverInhibitor:
                         self._cookie = int(parts[1])
                         log.info("Screensaver inhibited via dbus-send (cookie=%s)", self._cookie)
                         return
-            log.warning("ScreenSaver.Inhibit (dbus-send) failed: %s", result.stderr.strip())
+                log.warning("ScreenSaver.Inhibit (dbus-send) succeeded but no uint32 cookie in output: %r",
+                            result.stdout.strip())
+            else:
+                log.warning("ScreenSaver.Inhibit (dbus-send) failed: %s", result.stderr.strip())
         except Exception as exc:  # noqa: BLE001
             log.warning("ScreenSaver.Inhibit (dbus-send) error: %s", exc)
 

@@ -174,6 +174,7 @@ class BlueLockApp:
         )
         self._eval_timer.setInterval(int(new_cfg.scan_interval * 1000))
 
+        self._eval_timer.stop()
         self._inhibitor.uninhibit()
         self._monitor.stop_monitoring()
         self._device_present = False
