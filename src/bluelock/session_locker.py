@@ -10,6 +10,8 @@ log = logging.getLogger(__name__)
 # D-Bus constants for org.freedesktop.ScreenSaver
 _SS_SVC = "org.freedesktop.ScreenSaver"
 _SS_PATH = "/ScreenSaver"
+_SS_APP = "bluelock"
+_SS_REASON = "Bluetooth device nearby"
 
 
 class LockError(Exception):
@@ -129,3 +131,113 @@ class SessionLocker:
             detail = f": {result.stderr.strip()}" if result.stderr.strip() else ""
             raise LockError(f"{action.capitalize()} command exited {result.returncode}{detail}")
         log.info("Session %sed via command: %s", action, command)
+
+
+class ScreenSaverInhibitor:
+    """Inhibits the screensaver / idle-lock while a Bluetooth device is nearby.
+
+    Uses dbus-python (python3-dbus) if available — it returns dbus.UInt32 from
+    Inhibit so the cookie round-trips correctly in UnInhibit.
+
+    Falls back to dbus-send subprocess when dbus-python is not installed.
+
+    PyQt6.QtDBus cannot be used: it serialises Python int as D-Bus int32 ('i'),
+    but KDE's UnInhibit expects uint32 ('u') and rejects the call with
+    "No such method 'UnInhibit' (signature 'i')".
+    """
+
+    def __init__(self) -> None:
+        self._cookie = None           # dbus.UInt32 (dbus-python) or int (subprocess)
+        self._use_dbus_python: bool | None = None   # None = not yet probed
+
+    @property
+    def active(self) -> bool:
+        return self._cookie is not None
+
+    def inhibit(self) -> None:
+        """Inhibit the screensaver (no-op if already active)."""
+        if self._cookie is not None:
+            return
+        if self._use_dbus_python is None:
+            try:
+                import dbus as _dbus  # noqa: F401
+                self._use_dbus_python = True
+                log.debug("ScreenSaverInhibitor: using dbus-python")
+            except ImportError:
+                self._use_dbus_python = False
+                log.debug("ScreenSaverInhibitor: dbus-python not available, using dbus-send")
+        if self._use_dbus_python:
+            self._inhibit_dbus_python()
+        else:
+            self._inhibit_subprocess()
+
+    def uninhibit(self) -> None:
+        """Release the screensaver inhibition (no-op if not active)."""
+        if self._cookie is None:
+            return
+        if self._use_dbus_python:
+            self._uninhibit_dbus_python()
+        else:
+            self._uninhibit_subprocess()
+
+    # ------------------------------------------------------------------ #
+    # dbus-python implementation                                           #
+    # ------------------------------------------------------------------ #
+
+    def _inhibit_dbus_python(self) -> None:
+        try:
+            import dbus
+            bus = dbus.SessionBus()
+            iface = dbus.Interface(bus.get_object(_SS_SVC, _SS_PATH), _SS_SVC)
+            self._cookie = iface.Inhibit(_SS_APP, _SS_REASON)  # returns dbus.UInt32
+            log.info("Screensaver inhibited via dbus-python (cookie=%s)", self._cookie)
+        except Exception as exc:  # noqa: BLE001
+            log.warning("ScreenSaver.Inhibit (dbus-python) failed: %s", exc)
+
+    def _uninhibit_dbus_python(self) -> None:
+        try:
+            import dbus
+            bus = dbus.SessionBus()
+            iface = dbus.Interface(bus.get_object(_SS_SVC, _SS_PATH), _SS_SVC)
+            iface.UnInhibit(self._cookie)   # cookie is dbus.UInt32 — correct type
+            log.info("Screensaver uninhibited via dbus-python (cookie=%s)", self._cookie)
+        except Exception as exc:  # noqa: BLE001
+            log.warning("ScreenSaver.UnInhibit (dbus-python) failed: %s", exc)
+        finally:
+            self._cookie = None
+
+    # ------------------------------------------------------------------ #
+    # dbus-send subprocess fallback                                        #
+    # ------------------------------------------------------------------ #
+
+    def _inhibit_subprocess(self) -> None:
+        try:
+            result = subprocess.run(
+                ["dbus-send", "--session", "--print-reply", f"--dest={_SS_SVC}", _SS_PATH,
+                 f"{_SS_SVC}.Inhibit", f"string:{_SS_APP}", f"string:{_SS_REASON}"],
+                capture_output=True, text=True, timeout=5)
+            if result.returncode == 0:
+                for line in result.stdout.splitlines():
+                    parts = line.strip().split()
+                    if len(parts) == 2 and parts[0] == "uint32":
+                        self._cookie = int(parts[1])
+                        log.info("Screensaver inhibited via dbus-send (cookie=%s)", self._cookie)
+                        return
+            log.warning("ScreenSaver.Inhibit (dbus-send) failed: %s", result.stderr.strip())
+        except Exception as exc:  # noqa: BLE001
+            log.warning("ScreenSaver.Inhibit (dbus-send) error: %s", exc)
+
+    def _uninhibit_subprocess(self) -> None:
+        try:
+            result = subprocess.run(
+                ["dbus-send", "--session", "--print-reply", f"--dest={_SS_SVC}", _SS_PATH,
+                 f"{_SS_SVC}.UnInhibit", f"uint32:{self._cookie}"],
+                capture_output=True, text=True, timeout=5)
+            if result.returncode == 0:
+                log.info("Screensaver uninhibited via dbus-send (cookie=%s)", self._cookie)
+            else:
+                log.warning("ScreenSaver.UnInhibit (dbus-send) failed: %s", result.stderr.strip())
+        except Exception as exc:  # noqa: BLE001
+            log.warning("ScreenSaver.UnInhibit (dbus-send) error: %s", exc)
+        finally:
+            self._cookie = None
