@@ -10,6 +10,7 @@ from PyQt6.QtCore import QCoreApplication, QObject, QTimer, pyqtSlot
 from PyQt6.QtDBus import QDBusConnection, QDBusInterface, QDBusMessage
 
 from bluelock.bluetooth._types import DeviceInfo, mac_to_dbus_path, normalize_mac
+from bluelock.bluetooth._utils import btmgmt_rssi, hcitool_rssi
 
 log = logging.getLogger(__name__)
 
@@ -109,60 +110,17 @@ class RssiMonitor(QObject):
     def _tick(self) -> None:
         """Poll RSSI every second."""
         t = self._elapsed()
-        rssi, err = _btmgmt_rssi(self._mac)
+        rssi, err = btmgmt_rssi(self._mac)
         if rssi is not None:
             print(f"{t}  {'btmgmt':<14}  {rssi:4} dBm")
             return
         print(f"{t}  {'btmgmt':<14}  {err}")
-        rssi, err = _hcitool_rssi(self._mac)
+        rssi, err = hcitool_rssi(self._mac)
         if rssi is not None:
             print(f"{t}  {'hcitool':<14}  {rssi:4} dBm")
         else:
             print(f"{t}  {'hcitool':<14}  {err}")
 
-
-def _btmgmt_rssi(mac: str) -> tuple[int | None, str]:
-    """Read live RSSI via 'btmgmt conn-info' (requires CAP_NET_ADMIN / bluetooth group / sudo)."""
-    import subprocess
-    try:
-        result = subprocess.run(["sudo", "-n", "btmgmt", "conn-info", mac, "BR/EDR"], capture_output=True, text=True, timeout=5)
-        if result.returncode == 0:
-            parts = result.stdout.split()
-            for i, part in enumerate(parts):
-                if part == "rssi" and i + 1 < len(parts):
-                    try:
-                        val = int(parts[i + 1])
-                        if -120 <= val <= 20:
-                            return val, ""
-                    except ValueError:
-                        pass
-        output = (result.stdout + result.stderr).strip()
-        return None, (output.splitlines()[-1] if output else f"exit {result.returncode}")[:60]
-    except FileNotFoundError:
-        return None, "btmgmt not found"
-    except (subprocess.TimeoutExpired, OSError) as e:
-        return None, str(e)
-
-
-def _hcitool_rssi(mac: str) -> tuple[int | None, str]:
-    """Read RSSI via 'hcitool rssi' (deprecated fallback, part of bluez-deprecated)."""
-    import subprocess
-    try:
-        result = subprocess.run(["hcitool", "rssi", mac], capture_output=True, text=True, timeout=3)
-        if result.returncode == 0:
-            for part in result.stdout.split():
-                try:
-                    val = int(part)
-                    if -120 <= val <= 20:
-                        return val, ""
-                except ValueError:
-                    pass
-        output = (result.stdout + result.stderr).strip()
-        return None, (output or f"exit {result.returncode}")[:60]
-    except FileNotFoundError:
-        return None, "hcitool not found"
-    except (subprocess.TimeoutExpired, OSError) as e:
-        return None, str(e)
 
 
 def main() -> None:

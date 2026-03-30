@@ -10,6 +10,7 @@ from PyQt6.QtDBus import QDBusConnection, QDBusInterface, QDBusMessage
 
 from bluelock.bluetooth._base import AbstractBluetoothMonitor
 from bluelock.bluetooth._types import DeviceInfo, mac_to_dbus_path, normalize_mac
+from bluelock.bluetooth._utils import btmgmt_rssi, hcitool_rssi
 
 log = logging.getLogger(__name__)
 
@@ -249,10 +250,21 @@ class BluezDBusMonitor(AbstractBluetoothMonitor):
     # ------------------------------------------------------------------ #
 
     def _on_stale_check(self) -> None:
-        """Poll RSSI and track device reachability for classic BT devices."""
+        """Poll RSSI for classic BT devices if no D-Bus updates have been received."""
         if not self._monitoring or not self._target_mac:
             return
-        rssi = _btmgmt_rssi(self._target_mac) or _hcitool_rssi(self._target_mac)
+
+        # Optimization: only poll if we haven't received a D-Bus update recently.
+        # This reduces unnecessary subprocess calls for devices that emit regular
+        # RSSI updates via PropertiesChanged.
+        # Use 2.5x the poll interval as the threshold for 'stale'.
+        if time.monotonic() - self._last_rssi_time < (_RSSI_POLL_MS / 1_000 * 2.5):
+            return
+
+        rssi, _err = btmgmt_rssi(self._target_mac)
+        if rssi is None:
+            rssi, _err = hcitool_rssi(self._target_mac)
+
         if rssi is not None:
             log.debug("RSSI from poll: %d dBm", rssi)
             self._last_rssi_time = time.monotonic()
@@ -293,47 +305,3 @@ class BluezDBusMonitor(AbstractBluetoothMonitor):
                     rssi=props.get("RSSI"),
                 ))
         return devices
-
-
-def _btmgmt_rssi(mac: str) -> int | None:
-    """Read live RSSI via 'btmgmt conn-info' (requires CAP_NET_ADMIN / bluetooth group / sudo).
-
-    Output: "hci0 Get Conn Info Complete, status 0x00 rssi -10 tx_power 0 ..."
-    """
-    try:
-        result = subprocess.run(["sudo", "-n", "btmgmt", "conn-info", mac, "BR/EDR"],
-                                capture_output=True, text=True, timeout=5)
-        if result.returncode == 0:
-            parts = result.stdout.split()
-            for i, part in enumerate(parts):
-                if part == "rssi" and i + 1 < len(parts):
-                    try:
-                        val = int(parts[i + 1])
-                        if -120 <= val <= 20:
-                            return val
-                    except ValueError:
-                        pass
-    except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
-        pass
-    return None
-
-
-def _hcitool_rssi(mac: str) -> int | None:
-    """Read live RSSI via 'hcitool rssi' (deprecated, part of bluez-deprecated).
-
-    Fallback when btmgmt is unavailable or lacks permissions.
-    Output: "RSSI return value: -10"
-    """
-    try:
-        result = subprocess.run(["hcitool", "rssi", mac], capture_output=True, text=True, timeout=3)
-        if result.returncode == 0:
-            for part in result.stdout.split():
-                try:
-                    val = int(part)
-                    if -120 <= val <= 20:
-                        return val
-                except ValueError:
-                    pass
-    except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
-        pass
-    return None
