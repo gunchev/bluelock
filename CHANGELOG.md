@@ -1,3 +1,10 @@
+## 0.3.3 — 2026-03-31
+
+### Changes since v0.3.2
+
+- 3c9382a Increase config dialog minimum height to avoid scroll bars
+- d3c77e6 Start 0.3.3-dev
+
 ## 0.3.2 — 2026-03-31
 
 ### Changes since v0.3.1
