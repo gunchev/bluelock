@@ -211,3 +211,32 @@ When the monitored device is near how can we prevent KDE from locking the screen
 ## Prompt 37
 
 Update the PROMPT.md and commit. Tag new minor release.
+
+## Prompt 38
+
+Looks amazing. Please change the configuration dialog's "Settings" tab to be dynamically created when a device is
+selected, the name of the tab to be the MAC address. The goal is to allow for up to 4 devices to be configured at
+the same time. If there are devices configured, do not trigger scan when the configuration is opened, just focus the
+latest tab. Add a button to forget a device.
+
+## Prompt 39
+
+The RSSI for all devices seems the same.
+
+## Prompt 40
+
+OK, limit to single device. Lock the "Device" tab till the device is forgotten. At this point lock the "Settings"
+till a device is selected.
+
+## Prompt 41
+
+Move the advanced settings to the device tab. No point starting on login without configuration.
+
+## Prompt 42
+
+Name the first tab "Devices" and the second "Settings".
+
+## Prompt 43
+
+Update PROMPT.md.
+
