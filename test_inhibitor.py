@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Test script for ScreenSaverInhibitor.
 
-Run with: python3 test_inhibitor.py   (needs system dbus-python / dbus-send)
+Run with: uv run python test_inhibitor.py
 
 Calls inhibit(), waits 5 s, then uninhibit() twice to verify the cookie is released.
 Watch the screensaver settings while it runs — inhibition should be visible in
@@ -10,16 +10,10 @@ System Settings → Screen Locking while the script sleeps.
 from __future__ import annotations
 
 import sys
-import sysconfig
 import time
-
-# Use system site-packages so dbus-python is found (not available in the uv venv)
-sys.path.insert(0, sysconfig.get_path('platlib'))
 
 from PyQt6.QtCore import QCoreApplication, QTimer
 
-# Make the bluelock src importable
-sys.path.insert(0, 'src')
 from bluelock.session_locker import ScreenSaverInhibitor
 
 
