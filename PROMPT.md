@@ -345,3 +345,12 @@ Sorry, please continue, but also drop the `New format: [[devices]] array of tabl
 ## Prompt 66
 
 Add a "Force D-Bus" option too. Update @PROMPT.md.
+
+## Prompt 67
+
+Add a post-script in the rpm spec file that notifies all running instances to relaunch themselves after
+package update (exec, signal?).
+
+## Prompt 68
+
+Nice, update prompts, release...
