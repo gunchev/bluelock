@@ -1,3 +1,13 @@
+## 0.3.4 — 2026-03-31
+
+### Changes since v0.3.3
+
+- 9430a22 Add Force D-Bus RSSI method; update PROMPT.md
+- 62d4735 Add RSSI method override (auto/btmgmt/hcitool); bluelock_mon --method all
+- a16207e Simplify test_inhibitor.py now that dbus-python is in the venv
+- 9715d72 Add dbus-python as a project dependency
+- 6891cb9 Start 0.3.4-dev
+
 ## 0.3.3 — 2026-03-31
 
 ### Changes since v0.3.2
