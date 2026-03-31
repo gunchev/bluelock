@@ -224,6 +224,7 @@ class _DeviceTab(QWidget):
         form.addRow("Scan interval:", self._interval_spin)
         self._rssi_method_combo = QComboBox()
         self._rssi_method_combo.addItem("Auto-detect (D-Bus → btmgmt → hcitool)", "auto")
+        self._rssi_method_combo.addItem("Force D-Bus only (no polling fallback)", "dbus")
         self._rssi_method_combo.addItem("Force sudo btmgmt conn-info", "btmgmt")
         self._rssi_method_combo.addItem("Force hcitool rssi", "hcitool")
         self._rssi_method_combo.setToolTip("How to read RSSI when D-Bus updates are not available")

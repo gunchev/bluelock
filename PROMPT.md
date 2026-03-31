@@ -284,3 +284,64 @@ Add logging to show when switching to polling and dbus and which tool was used. 
 ## Prompt 51
 
 Add credit to Claude and Junnie in the about dialog.
+
+## Prompt 52
+
+Fix the problem, don't SimulateUserActivity. Add timestamp to all logs (+%Y-%m-%d %H:%M:%S.%N).
+
+## Prompt 53
+
+Put the ScreenSaverInhibitor in a test script and let's fix it.
+
+## Prompt 54
+
+What was left to check/fix/improve from Junie's changes?
+
+## Prompt 55
+
+Fix the real issues. Why can't ScreenSaverInhibitor be tested with mocks?
+
+## Prompt 56
+
+Nice, commit and make new release.
+
+## Prompt 57
+
+The RPM package displays no icon. Multiple instances can be started.
+
+## Prompt 58
+
+The icons are now duplicated, no?
+
+## Prompt 59
+
+OK, make new release please.
+
+## Prompt 60
+
+Make the configuration dialog 20-30 pixels taller, to avoid scroll bars.
+
+## Prompt 61
+
+Nice, release again ;-)
+
+## Prompt 62
+
+Add dbus-python to the uv environment/project requirements so it can be properly used.
+
+## Prompt 63
+
+Update @test_inhibitor.py to reflect the change.
+
+## Prompt 64
+
+Add an advanced option to use autodetection of the best method to get RSSI or override it and force using
+`sudo btmgmt` or `hcitool`. Allow bluelock_mon to test all these options too.
+
+## Prompt 65
+
+Sorry, please continue, but also drop the `New format: [[devices]] array of tables` references. Single device.
+
+## Prompt 66
+
+Add a "Force D-Bus" option too. Update @PROMPT.md.

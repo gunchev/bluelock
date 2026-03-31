@@ -6,7 +6,7 @@ import subprocess
 
 log = logging.getLogger(__name__)
 
-RSSI_METHODS = ("auto", "btmgmt", "hcitool")
+RSSI_METHODS = ("auto", "dbus", "btmgmt", "hcitool")
 
 _btmgmt_available = True
 _hcitool_available = True

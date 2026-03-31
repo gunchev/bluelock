@@ -78,7 +78,7 @@ def main() -> None:
     parser.add_argument("mac", help="Bluetooth MAC address (AA:BB:CC:DD:EE:FF)")
     parser.add_argument("--method", "-m", default="auto",
                         choices=[*RSSI_METHODS, "all"],
-                        help="RSSI source: auto (default), btmgmt, hcitool, or all (show each source)")
+                        help="RSSI source: auto (default), dbus, btmgmt, hcitool, or all (show each source)")
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.WARNING)

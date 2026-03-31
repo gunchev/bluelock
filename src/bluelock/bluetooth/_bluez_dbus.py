@@ -271,6 +271,10 @@ class BluezDBusMonitor(AbstractBluetoothMonitor):
         if not self._monitoring or not self._target_mac:
             return
 
+        # D-Bus-only mode: never fall back to subprocess polling.
+        if self._rssi_method == "dbus":
+            return
+
         # Optimization: only poll if we haven't received a D-Bus update recently.
         # This reduces unnecessary subprocess calls for devices that emit regular
         # RSSI updates via PropertiesChanged.
