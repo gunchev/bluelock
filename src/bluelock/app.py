@@ -219,6 +219,16 @@ def main() -> None:
     # Install a handler that calls quit(), and a timer that wakes Python periodically
     # so the signal is actually delivered.
     signal.signal(signal.SIGINT, lambda *_: app.quit())
+
+    # SIGUSR1: re-exec ourselves — sent by the RPM %posttrans scriptlet after an update
+    # so the running instance picks up the new code without user intervention.
+    def _restart() -> None:
+        log.info("Received SIGUSR1 — restarting to apply package update")
+        import os
+        os.execv(sys.argv[0], sys.argv)
+
+    signal.signal(signal.SIGUSR1, lambda *_: QTimer.singleShot(0, _restart))
+
     sig_timer = QTimer()
     sig_timer.start(200)
     sig_timer.timeout.connect(lambda: None)

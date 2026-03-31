@@ -47,6 +47,12 @@ install -Dpm 0644 %{SOURCE1} %{buildroot}%{_datadir}/applications/%{name}.deskto
 install -Dpm 0644 %{SOURCE2} %{buildroot}%{_datadir}/icons/hicolor/scalable/apps/%{name}.svg
 install -Dpm 0440 %{SOURCE3} %{buildroot}%{_sysconfdir}/sudoers.d/%{name}
 
+%posttrans
+# After an upgrade, tell any running instance to re-exec itself so it picks up
+# the new code without the user having to restart it manually.
+# SIGUSR1 triggers os.execv() inside the Qt event loop (safe, non-disruptive).
+pkill -USR1 -x bluelock 2>/dev/null || true
+
 %check
 desktop-file-validate %{buildroot}%{_datadir}/applications/%{name}.desktop
 
