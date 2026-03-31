@@ -10,7 +10,7 @@ from PyQt6.QtDBus import QDBusConnection, QDBusInterface, QDBusMessage
 
 from bluelock.bluetooth._base import AbstractBluetoothMonitor
 from bluelock.bluetooth._types import DeviceInfo, mac_to_dbus_path, normalize_mac
-from bluelock.bluetooth._utils import btmgmt_rssi, hcitool_rssi
+from bluelock.bluetooth._utils import poll_rssi
 
 log = logging.getLogger(__name__)
 
@@ -47,6 +47,7 @@ class BluezDBusMonitor(AbstractBluetoothMonitor):
         self._poll_reachable = False   # True when btmgmt/hcitool last succeeded
         self._using_poll = False
         self._poll_tool = ""
+        self._rssi_method = "auto"
 
         # Timer for hcitool RSSI polling (classic BT devices don't emit RSSI via PropertiesChanged)
         self._stale_timer = QTimer(self)
@@ -133,6 +134,14 @@ class BluezDBusMonitor(AbstractBluetoothMonitor):
     @property
     def is_scanning(self) -> bool:
         return self._scanning
+
+    @property
+    def rssi_method(self) -> str:
+        return self._rssi_method
+
+    @rssi_method.setter
+    def rssi_method(self, value: str) -> None:
+        self._rssi_method = value
 
     # ------------------------------------------------------------------ #
     # D-Bus signal connections                                             #
@@ -269,11 +278,7 @@ class BluezDBusMonitor(AbstractBluetoothMonitor):
         if time.monotonic() - self._last_rssi_time < (_RSSI_POLL_MS / 1_000 * 2.5):
             return
 
-        rssi, _err = btmgmt_rssi(self._target_mac)
-        tool = "btmgmt"
-        if rssi is None:
-            rssi, _err = hcitool_rssi(self._target_mac)
-            tool = "hcitool"
+        rssi, _err, tool = poll_rssi(self._target_mac, self._rssi_method)
 
         if rssi is not None:
             if not self._using_poll or self._poll_tool != tool:

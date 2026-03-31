@@ -30,6 +30,7 @@ class Config:
     device: DeviceConfig | None = None
     buffer_size: int = 16
     scan_interval: float = 1.0
+    rssi_method: str = "auto"
 
     # ------------------------------------------------------------------
     # Properties for easy access to device settings
@@ -102,14 +103,14 @@ class Config:
         cfg = cls(
             buffer_size=int(advanced.get("buffer_size", 16)),
             scan_interval=float(advanced.get("scan_interval", 1.0)),
+            rssi_method=str(advanced.get("rssi_method", "auto")),
         )
 
-        # New format: [[devices]] array of tables
-        devices = data.get("devices", [])
-        if devices:
-            d = devices[0]
+        # Current format: [device] single table with all fields
+        d = data.get("device", {})
+        if d.get("mac") and "lock_rssi" in d:
             cfg.device = DeviceConfig(
-                mac=str(d.get("mac", "")),
+                mac=str(d["mac"]),
                 name=str(d.get("name", "")),
                 lock_rssi_threshold=int(d.get("lock_rssi", -15)),
                 lock_duration=int(d.get("lock_duration", 4)),
@@ -119,7 +120,23 @@ class Config:
                 unlock_command=str(d.get("unlock_command", "")),
             )
 
-        # Backward compat: old [device] / [thresholds] / [commands] sections
+        # Backward compat: [[devices]] array (used in 0.3.x)
+        if not cfg.device:
+            devices = data.get("devices", [])
+            if devices:
+                d = devices[0]
+                cfg.device = DeviceConfig(
+                    mac=str(d.get("mac", "")),
+                    name=str(d.get("name", "")),
+                    lock_rssi_threshold=int(d.get("lock_rssi", -15)),
+                    lock_duration=int(d.get("lock_duration", 4)),
+                    unlock_rssi_threshold=int(d.get("unlock_rssi", -10)),
+                    unlock_duration=int(d.get("unlock_duration", 4)),
+                    lock_command=str(d.get("lock_command", "")),
+                    unlock_command=str(d.get("unlock_command", "")),
+                )
+
+        # Backward compat: old [device] + [thresholds] + [commands] sections (pre-0.3)
         if not cfg.device:
             device = data.get("device", {})
             thresholds = data.get("thresholds", {})
@@ -158,10 +175,11 @@ def _to_toml(cfg: Config) -> str:
     lines.append("[advanced]")
     lines.append(f"buffer_size = {cfg.buffer_size}")
     lines.append(f"scan_interval = {cfg.scan_interval!r}")
+    lines.append(f'rssi_method = "{_escape(cfg.rssi_method)}"')
     lines.append("")
 
     if cfg.device:
-        lines.append("[[devices]]")
+        lines.append("[device]")
         lines.append(f'mac = "{_escape(cfg.device.mac)}"')
         lines.append(f'name = "{_escape(cfg.device.name)}"')
         lines.append(f"lock_rssi = {cfg.device.lock_rssi_threshold}")

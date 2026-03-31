@@ -7,6 +7,7 @@ from pathlib import Path
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtWidgets import (
     QCheckBox,
+    QComboBox,
     QDialog,
     QDialogButtonBox,
     QDoubleSpinBox,
@@ -81,7 +82,7 @@ class _DeviceTab(QWidget):
 
     forget_requested = pyqtSignal(str)  # emits MAC address
 
-    def __init__(self, dev: DeviceConfig, buffer_size: int = 16, scan_interval: float = 1.0, parent: QWidget | None = None) -> None:
+    def __init__(self, dev: DeviceConfig, buffer_size: int = 16, scan_interval: float = 1.0, rssi_method: str = "auto", parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._mac = dev.mac
         self._name = dev.name
@@ -107,7 +108,7 @@ class _DeviceTab(QWidget):
         forget_btn.clicked.connect(lambda: self.forget_requested.emit(self._mac))
         outer.addWidget(forget_btn)
 
-        self._populate(dev, buffer_size, scan_interval)
+        self._populate(dev, buffer_size, scan_interval, rssi_method)
 
     @property
     def buffer_size(self) -> int:
@@ -116,6 +117,10 @@ class _DeviceTab(QWidget):
     @property
     def scan_interval(self) -> float:
         return self._interval_spin.value()
+
+    @property
+    def rssi_method(self) -> str:
+        return self._rssi_method_combo.currentData()
 
     @property
     def autostart_enabled(self) -> bool:
@@ -217,11 +222,17 @@ class _DeviceTab(QWidget):
         self._interval_spin.setSuffix(" s")
         self._interval_spin.setToolTip("How often to evaluate the lock/unlock state")
         form.addRow("Scan interval:", self._interval_spin)
+        self._rssi_method_combo = QComboBox()
+        self._rssi_method_combo.addItem("Auto-detect (D-Bus → btmgmt → hcitool)", "auto")
+        self._rssi_method_combo.addItem("Force sudo btmgmt conn-info", "btmgmt")
+        self._rssi_method_combo.addItem("Force hcitool rssi", "hcitool")
+        self._rssi_method_combo.setToolTip("How to read RSSI when D-Bus updates are not available")
+        form.addRow("RSSI method:", self._rssi_method_combo)
         self._autostart_check = QCheckBox("Start BlueLock automatically on login")
         form.addRow("Auto-start:", self._autostart_check)
         return box
 
-    def _populate(self, dev: DeviceConfig, buffer_size: int, scan_interval: float) -> None:
+    def _populate(self, dev: DeviceConfig, buffer_size: int, scan_interval: float, rssi_method: str = "auto") -> None:
         self._lock_rssi_spin.setValue(dev.lock_rssi_threshold)
         self._lock_rssi_slider.setValue(dev.lock_rssi_threshold)
         self._lock_dur_spin.setValue(dev.lock_duration)
@@ -232,6 +243,8 @@ class _DeviceTab(QWidget):
         self._unlock_cmd_edit.setText(dev.unlock_command)
         self._buffer_spin.setValue(buffer_size)
         self._interval_spin.setValue(scan_interval)
+        idx = self._rssi_method_combo.findData(rssi_method)
+        self._rssi_method_combo.setCurrentIndex(idx if idx >= 0 else 0)
         self._autostart_check.setChecked(_autostart_enabled())
 
 
@@ -251,7 +264,7 @@ class ConfigDialog(QDialog):
         self._build_ui()
 
         if config.device:
-            self._set_device_tab(config.device, config.buffer_size, config.scan_interval)
+            self._set_device_tab(config.device, config.buffer_size, config.scan_interval, config.rssi_method)
 
     # ------------------------------------------------------------------ #
     # Public                                                               #
@@ -270,6 +283,7 @@ class ConfigDialog(QDialog):
             device=self._device_tab.to_device_config() if self._device_tab else None,
             buffer_size=self._device_tab.buffer_size if self._device_tab else 16,
             scan_interval=self._device_tab.scan_interval if self._device_tab else 1.0,
+            rssi_method=self._device_tab.rssi_method if self._device_tab else "auto",
         )
 
     # ------------------------------------------------------------------ #
@@ -321,12 +335,12 @@ class ConfigDialog(QDialog):
 
         return tab
 
-    def _set_device_tab(self, dev: DeviceConfig, buffer_size: int = 16, scan_interval: float = 1.0) -> int:
+    def _set_device_tab(self, dev: DeviceConfig, buffer_size: int = 16, scan_interval: float = 1.0, rssi_method: str = "auto") -> int:
         """Create or update the settings tab for *dev*, lock the Device tab, and return the index."""
         if self._device_tab:
             self._tabs.removeTab(1)
 
-        self._device_tab = _DeviceTab(dev, buffer_size, scan_interval)
+        self._device_tab = _DeviceTab(dev, buffer_size, scan_interval, rssi_method)
         self._device_tab.forget_requested.connect(self._on_forget)
         idx = self._tabs.addTab(self._device_tab, "Settings")
         self._tabs.setTabEnabled(0, False)

@@ -27,6 +27,7 @@ class BlueLockApp:
 
         self._config = Config.load()
         self._monitor = get_monitor()
+        self._monitor.rssi_method = self._config.rssi_method
         self._processor = SignalProcessor(self._config.buffer_size)
         self._machine = ProximityStateMachine(
             lock_rssi_threshold=self._config.lock_rssi_threshold,
@@ -165,6 +166,7 @@ class BlueLockApp:
 
         self._locker.lock_command = new_cfg.lock_command
         self._locker.unlock_command = new_cfg.unlock_command
+        self._monitor.rssi_method = new_cfg.rssi_method
         self._processor.buffer_size = new_cfg.buffer_size
         self._machine = ProximityStateMachine(
             lock_rssi_threshold=new_cfg.lock_rssi_threshold,
