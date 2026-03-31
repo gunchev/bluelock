@@ -1,3 +1,11 @@
+## 0.3.5 — 2026-03-31
+
+### Changes since v0.3.4
+
+- 1221f2b Update PROMPT.md with prompts 67-68
+- 7bd01c2 Restart running instance after RPM update via SIGUSR1
+- e055a78 Start 0.3.5-dev
+
 ## 0.3.4 — 2026-03-31
 
 ### Changes since v0.3.3
