@@ -1,4 +1,5 @@
 """Configuration dialog."""
+
 from __future__ import annotations
 
 import logging
@@ -83,7 +84,14 @@ class _DeviceTab(QWidget):
 
     forget_requested = pyqtSignal(str)  # emits MAC address
 
-    def __init__(self, dev: DeviceConfig, buffer_size: int = 16, scan_interval: float = 1.0, rssi_method: str = "auto", parent: QWidget | None = None) -> None:
+    def __init__(
+        self,
+        dev: DeviceConfig,
+        buffer_size: int = 16,
+        scan_interval: float = 1.0,
+        rssi_method: str = "auto",
+        parent: QWidget | None = None,
+    ) -> None:
         super().__init__(parent)
         self._mac = dev.mac
         self._name = dev.name
@@ -258,7 +266,6 @@ class ConfigDialog(QDialog):
         self.setWindowTitle("BlueLock — Preferences")
         self.setMinimumSize(720, 715)
 
-        self._config = config
         self._monitor = None
         self._scan_results: dict[str, DeviceInfo] = {}
         self._device_tab: _DeviceTab | None = None
@@ -337,7 +344,9 @@ class ConfigDialog(QDialog):
 
         return tab
 
-    def _set_device_tab(self, dev: DeviceConfig, buffer_size: int = 16, scan_interval: float = 1.0, rssi_method: str = "auto") -> int:
+    def _set_device_tab(
+        self, dev: DeviceConfig, buffer_size: int = 16, scan_interval: float = 1.0, rssi_method: str = "auto"
+    ) -> int:
         """Create or update the settings tab for *dev*, lock the Device tab, and return the index."""
         if self._device_tab:
             self._tabs.removeTab(1)

@@ -1,4 +1,5 @@
 """Tests for bluelock.config."""
+
 from bluelock.config import Config, DeviceConfig, _to_toml
 
 
@@ -61,8 +62,8 @@ class TestConfigLoadSave:
         tmp_config_path.write_text('[device]\nmac = "12:34:56:78:9A:BC"\n')
         loaded = Config.load(tmp_config_path)
         assert loaded.device_mac == "12:34:56:78:9A:BC"
-        assert loaded.device_name == ""         # default
-        assert loaded.lock_duration == 4        # default
+        assert loaded.device_name == ""  # default
+        assert loaded.lock_duration == 4  # default
 
     def test_save_creates_parent_directory(self, tmp_path):
         path = tmp_path / "subdir" / "config.toml"
@@ -102,13 +103,16 @@ class TestToToml:
         assert "scan_interval = 1.5" in result
 
     def test_bools_not_present_in_config(self):
-        # Config no longer has direct booleans that are serialized
-        pass
+        c = Config(device=DeviceConfig(mac="00:11:22"))
+        result = _to_toml(c)
+        for line in result.splitlines():
+            if line and not line.startswith("#"):
+                assert not line.strip().lower().startswith(("true", "false")), f"Unexpected boolean: {line}"
 
     def test_string_with_quotes_escaped(self):
         c = Config(device=DeviceConfig(mac="00:11:22", name='say "hello"'))
         result = _to_toml(c)
-        assert r'say \"hello\"' in result
+        assert r"say \"hello\"" in result
 
     def test_sections_separated_by_blank_line(self):
         c = Config(device=DeviceConfig(mac="00:11:22"))
