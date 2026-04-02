@@ -1,8 +1,10 @@
 """Tests for bluelock.session_locker."""
 import subprocess
+from unittest.mock import MagicMock
+
 import pytest
-from unittest.mock import patch, MagicMock
-from bluelock.session_locker import SessionLocker, LockError
+
+from bluelock.session_locker import LockError, SessionLocker
 
 
 class TestRunCommand:
@@ -25,8 +27,7 @@ class TestRunCommand:
             locker.lock()
 
     def test_empty_command_raises_lock_error(self):
-        locker = SessionLocker(lock_command="")
-        # Empty command string means use D-Bus, not empty args
+        SessionLocker(lock_command="")  # empty string means D-Bus, not empty args
         # Test with whitespace-only string to hit the empty-args branch
         locker2 = SessionLocker.__new__(SessionLocker)
         locker2.lock_command = "   "
@@ -70,7 +71,7 @@ class TestDbusLock:
 
     def test_dbus_lock_calls_lock_method(self, mocker):
         try:
-            from PyQt6.QtDBus import QDBusConnection
+            from PyQt6.QtDBus import QDBusConnection  # noqa: F401
         except ImportError:
             pytest.skip("PyQt6.QtDBus not available")
         mock_bus = self._make_mock_bus()
@@ -83,7 +84,7 @@ class TestDbusLock:
 
     def test_dbus_unlock_calls_login1_unlock(self, mocker):
         try:
-            from PyQt6.QtDBus import QDBusConnection, QDBusMessage
+            from PyQt6.QtDBus import QDBusConnection, QDBusMessage  # noqa: F401
         except ImportError:
             pytest.skip("PyQt6.QtDBus not available")
 
@@ -120,7 +121,7 @@ class TestDbusLock:
 
     def test_dbus_error_raises_lock_error(self, mocker):
         try:
-            from PyQt6.QtDBus import QDBusConnection
+            from PyQt6.QtDBus import QDBusConnection  # noqa: F401
         except ImportError:
             pytest.skip("PyQt6.QtDBus not available")
         mock_bus = self._make_mock_bus(error=True)

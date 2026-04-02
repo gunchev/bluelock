@@ -23,13 +23,14 @@ from PyQt6.QtWidgets import (
     QSizePolicy,
     QSlider,
     QSpinBox,
-    QTabWidget,
     QTableWidget,
     QTableWidgetItem,
+    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
 
+from bluelock.bluetooth._base import AbstractBluetoothMonitor
 from bluelock.bluetooth._types import DeviceInfo
 from bluelock.config import Config, DeviceConfig
 from bluelock.signal_processor import estimate_distance_m
@@ -271,7 +272,7 @@ class ConfigDialog(QDialog):
     # Public                                                               #
     # ------------------------------------------------------------------ #
 
-    def connect_monitor(self, monitor) -> None:
+    def connect_monitor(self, monitor: AbstractBluetoothMonitor) -> None:
         """Connect to a Bluetooth monitor's signals."""
         self._monitor = monitor
         monitor.rssi_updated.connect(self._on_rssi_update)

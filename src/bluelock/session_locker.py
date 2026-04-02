@@ -72,8 +72,9 @@ class SessionLocker:
         is what 'loginctl unlock-session' uses and works on KDE/GNOME/etc.
         """
         try:
-            from PyQt6.QtDBus import QDBusConnection, QDBusMessage
             import os
+
+            from PyQt6.QtDBus import QDBusConnection, QDBusMessage
 
             bus = QDBusConnection.systemBus()
 

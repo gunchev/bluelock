@@ -1,8 +1,9 @@
 """Tests for bluelock.state_machine."""
-import pytest
 import time
-from bluelock.state_machine import ProximityState, ProximityStateMachine
 
+import pytest
+
+from bluelock.state_machine import ProximityState, ProximityStateMachine
 
 LOCK_RSSI = -15
 UNLOCK_RSSI = -10

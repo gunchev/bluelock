@@ -61,18 +61,16 @@ line-length = 120
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "C4", "SIM"]
-
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-pythonpath = ["src"]
-
-# Disable rules that are too restrictive compared to autopep8
 ignore = [
-    "E501", # Ignore line length violations (autopep8 handles this differently)
+    "E501", # Line length violations (handled by formatter)
     "E111", # Indentation is not a multiple of four
     "E114", # Indentation is not a multiple of four (comment)
     "E701", # Multiple statements on one line (colon)
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
 
 [tool.ruff.format]
 # Use spaces for indentation

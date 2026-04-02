@@ -1,13 +1,9 @@
 """Tests for bluelock.session_locker.ScreenSaverInhibitor."""
-import subprocess
 import sys
 from types import ModuleType
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from bluelock.session_locker import ScreenSaverInhibitor
-
 
 # --------------------------------------------------------------------------- #
 # Helpers                                                                       #

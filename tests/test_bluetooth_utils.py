@@ -1,6 +1,8 @@
 """Tests for Bluetooth utilities."""
 import subprocess
+
 from bluelock.bluetooth import _utils
+
 
 def test_btmgmt_rssi_caching(mocker):
     # Reset internal state

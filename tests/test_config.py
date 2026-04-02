@@ -1,5 +1,4 @@
 """Tests for bluelock.config."""
-import pytest
 from bluelock.config import Config, DeviceConfig, _to_toml
 
 

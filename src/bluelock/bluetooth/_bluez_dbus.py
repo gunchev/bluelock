@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import logging
-import subprocess
 import time
 
 from PyQt6.QtCore import QTimer, pyqtSlot

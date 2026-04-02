@@ -49,7 +49,7 @@ coverage:
 
 .PHONY: lint
 lint:
-	ruff check "src/$(name)"
+	ruff check "src/$(name)" tests
 
 
 .PHONY: format

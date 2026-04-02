@@ -1,7 +1,7 @@
 """Tests for bluelock.signal_processor."""
-import math
 import pytest
-from bluelock.signal_processor import SignalProcessor, NO_SIGNAL
+
+from bluelock.signal_processor import NO_SIGNAL, SignalProcessor
 
 
 class TestSignalProcessorBuffer:

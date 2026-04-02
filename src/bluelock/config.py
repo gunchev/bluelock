@@ -120,22 +120,6 @@ class Config:
                 unlock_command=str(d.get("unlock_command", "")),
             )
 
-        # Backward compat: [[devices]] array (used in 0.3.x)
-        if not cfg.device:
-            devices = data.get("devices", [])
-            if devices:
-                d = devices[0]
-                cfg.device = DeviceConfig(
-                    mac=str(d.get("mac", "")),
-                    name=str(d.get("name", "")),
-                    lock_rssi_threshold=int(d.get("lock_rssi", -15)),
-                    lock_duration=int(d.get("lock_duration", 4)),
-                    unlock_rssi_threshold=int(d.get("unlock_rssi", -10)),
-                    unlock_duration=int(d.get("unlock_duration", 4)),
-                    lock_command=str(d.get("lock_command", "")),
-                    unlock_command=str(d.get("unlock_command", "")),
-                )
-
         # Backward compat: old [device] + [thresholds] + [commands] sections (pre-0.3)
         if not cfg.device:
             device = data.get("device", {})

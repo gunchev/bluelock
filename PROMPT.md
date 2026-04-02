@@ -354,3 +354,12 @@ package update (exec, signal?).
 ## Prompt 68
 
 Nice, update prompts, release...
+
+## Prompt 69
+
+Check the project for mistakes, unused code or options, opportunities for improvement. Suggest a plan.
+Ask questions for each change and anything you need for better plan.
+
+## Prompt 70
+
+Nice, save the prompts, commit and do a new release.
