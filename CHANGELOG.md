@@ -1,3 +1,10 @@
+## 0.4.0 — 2026-04-03
+
+### Changes since v0.3.6
+
+- c52b53a Code review fixes: sync version, remove unused code, fix empty test
+- 24ecfef Start 0.3.7-dev
+
 ## 0.3.6 — 2026-04-03
 
 ### Changes since v0.3.5
