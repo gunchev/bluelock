@@ -1,3 +1,10 @@
+## 0.3.6 — 2026-04-03
+
+### Changes since v0.3.5
+
+- d39cd50 Clean up lint issues, remove dead code, fix ruff config placement
+- 12195ce Start 0.3.6-dev
+
 ## 0.3.5 — 2026-03-31
 
 ### Changes since v0.3.4
