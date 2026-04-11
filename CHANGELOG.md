@@ -1,3 +1,10 @@
+## 0.4.1 — 2026-04-11
+
+### Changes since v0.4.0
+
+- 09c64f6 COPR integration...
+- 6281a6d Start 0.4.1-dev
+
 ## 0.4.0 — 2026-04-03
 
 ### Changes since v0.3.6
