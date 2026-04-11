@@ -1,3 +1,10 @@
+## 0.4.2 — 2026-04-11
+
+### Changes since v0.4.1
+
+- d489c29 Missing deps, sync release.py
+- b7d17ef Start 0.4.2-dev
+
 ## 0.4.1 — 2026-04-11
 
 ### Changes since v0.4.0

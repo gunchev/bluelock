@@ -11,9 +11,12 @@ Source2:        %{name}.svg
 Source3:        %{name}-sudoers
 
 BuildArch:      noarch
-BuildRequires:  python3-devel
-BuildRequires:  pyproject-rpm-macros
+
 BuildRequires:  desktop-file-utils
+BuildRequires:  pyproject-rpm-macros
+BuildRequires:  python3-devel
+BuildRequires:  python3-pip
+BuildRequires:  python3-hatchling
 
 Requires:       python3
 Requires:       python3-pyqt6-base
