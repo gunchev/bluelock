@@ -12,10 +12,14 @@ def tmp_config_path(tmp_path):
 
 @pytest.fixture(scope="session")
 def qapp():
-    """Provide a QCoreApplication for tests that instantiate QObject subclasses.
+    """Provide a QApplication for tests that instantiate Qt objects.
 
-    Session-scoped because Qt does not support creating multiple QCoreApplications.
+    Widget tests need a real QApplication (not just QCoreApplication). The offscreen
+    Qt platform plugin is forced so widgets can be constructed without a display.
+    Session-scoped because Qt does not support creating multiple QApplications.
     """
-    from PyQt6.QtCore import QCoreApplication
-    app = QCoreApplication.instance() or QCoreApplication(sys.argv)
+    import os
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PyQt6.QtWidgets import QApplication
+    app = QApplication.instance() or QApplication(sys.argv)
     yield app

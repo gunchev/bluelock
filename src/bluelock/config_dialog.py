@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 from pathlib import Path
 
@@ -18,6 +19,8 @@ from PyQt6.QtWidgets import (
     QHeaderView,
     QLabel,
     QLineEdit,
+    QListWidget,
+    QListWidgetItem,
     QProgressBar,
     QPushButton,
     QScrollArea,
@@ -31,8 +34,9 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from bluelock.bluetooth._adapters import AdapterInfo, list_adapters
 from bluelock.bluetooth._base import AbstractBluetoothMonitor
-from bluelock.bluetooth._types import DeviceInfo
+from bluelock.bluetooth._types import DeviceInfo, normalize_mac
 from bluelock.config import Config, DeviceConfig
 from bluelock.signal_processor import estimate_distance_m
 
@@ -79,6 +83,133 @@ def _rssi_slider(default: int) -> QSlider:
     return slider
 
 
+@dataclasses.dataclass(frozen=True)
+class _AdapterRow:
+    """One displayable adapter entry — present, missing, or new selection."""
+
+    address: str
+    info: AdapterInfo | None   # None if configured address is not currently available
+    checked: bool
+
+    @property
+    def available(self) -> bool:
+        return self.info is not None
+
+    def display_text(self) -> str:
+        if self.info is None:
+            return f"{self.address}  —  (unavailable)"
+        a = self.info
+        label = a.alias or a.hci_name
+        suffix = "" if a.powered else "  (off)"
+        return f"{a.hci_name}  —  {a.address}  —  {label}{suffix}"
+
+
+def _merge_adapter_rows(available: list[AdapterInfo], configured: list[str]) -> list[_AdapterRow]:
+    """Return rows for the adapters list, preserving missing-but-configured entries.
+
+    Pure function — tests drive it without Qt. Order: currently-available adapters first
+    (in their enumeration order), then any configured addresses that aren't present.
+    """
+    configured_norm = [a for a in (normalize_mac(x) for x in configured) if a]
+    configured_set = set(configured_norm)
+    seen: set[str] = set()
+    rows: list[_AdapterRow] = []
+    for ainfo in available:
+        if not ainfo.address:
+            continue
+        seen.add(ainfo.address)
+        rows.append(_AdapterRow(
+            address=ainfo.address,
+            info=ainfo,
+            checked=ainfo.address in configured_set,
+        ))
+    for addr in configured_norm:
+        if addr in seen:
+            continue
+        rows.append(_AdapterRow(address=addr, info=None, checked=True))
+    return rows
+
+
+class _AdaptersGroup(QGroupBox):
+    """Adapter selection group.
+
+    Shows a check-list of Bluetooth adapters. Empty selection = "use all adapters".
+    Configured addresses that are not currently present (e.g. unplugged dongle) are
+    preserved in the list as ``(unavailable)`` so saving doesn't silently drop them.
+    """
+
+    selection_changed = pyqtSignal()
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__("Bluetooth Adapters", parent)
+        self._configured: list[str] = []
+
+        layout = QVBoxLayout(self)
+        hint = QLabel("Tick the adapters to use. If none are ticked, all available adapters are used.")
+        hint.setWordWrap(True)
+        layout.addWidget(hint)
+
+        self._list = QListWidget()
+        self._list.setSelectionMode(QListWidget.SelectionMode.NoSelection)
+        self._list.itemChanged.connect(self._on_item_changed)
+        layout.addWidget(self._list)
+
+        button_row = QHBoxLayout()
+        button_row.addStretch()
+        self._refresh_btn = QPushButton("Refresh")
+        self._refresh_btn.clicked.connect(self.refresh)
+        button_row.addWidget(self._refresh_btn)
+        layout.addLayout(button_row)
+
+    # ------------------------------------------------------------------ #
+    # Public API                                                           #
+    # ------------------------------------------------------------------ #
+
+    def set_configured(self, addresses: list[str]) -> None:
+        """Set the configured selection and rebuild the list against current adapters."""
+        self._configured = [a for a in (normalize_mac(x) for x in addresses) if a]
+        self.refresh()
+
+    def selected_addresses(self) -> list[str]:
+        """Return BD addresses of currently-checked rows."""
+        out: list[str] = []
+        for i in range(self._list.count()):
+            item = self._list.item(i)
+            if item.checkState() == Qt.CheckState.Checked:
+                out.append(item.data(Qt.ItemDataRole.UserRole))
+        return out
+
+    def refresh(self) -> None:
+        """Re-enumerate adapters and rebuild the list, preserving check state."""
+        # Use current check state (if any rows already exist) as the source of truth,
+        # so a hot-plug refresh doesn't drop the user's pending edits.
+        current = self.selected_addresses() or self._configured
+        rows = _merge_adapter_rows(list_adapters(), current)
+        self._populate(rows)
+
+    # ------------------------------------------------------------------ #
+    # Internal                                                             #
+    # ------------------------------------------------------------------ #
+
+    def _populate(self, rows: list[_AdapterRow]) -> None:
+        self._list.blockSignals(True)
+        self._list.clear()
+        for row in rows:
+            item = QListWidgetItem(row.display_text())
+            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+            item.setCheckState(Qt.CheckState.Checked if row.checked else Qt.CheckState.Unchecked)
+            item.setData(Qt.ItemDataRole.UserRole, row.address)
+            if not row.available:
+                item.setToolTip("Adapter not currently present — kept so the saved selection is preserved.")
+            elif row.info and not row.info.powered:
+                item.setToolTip("Adapter is currently powered off.")
+            self._list.addItem(item)
+        self._list.blockSignals(False)
+
+    def _on_item_changed(self, _item: QListWidgetItem) -> None:
+        self.selection_changed.emit()
+
+
 class _DeviceTab(QWidget):
     """Per-device settings tab with signal display, thresholds, commands and a forget button."""
 
@@ -104,6 +235,8 @@ class _DeviceTab(QWidget):
         layout.addWidget(self._build_signal_group())
         layout.addWidget(self._build_thresholds_group())
         layout.addWidget(self._build_commands_group())
+        self._adapters_group = _AdaptersGroup()
+        layout.addWidget(self._adapters_group)
         layout.addWidget(self._build_advanced_group())
         layout.addStretch()
 
@@ -145,7 +278,12 @@ class _DeviceTab(QWidget):
             unlock_duration=self._unlock_dur_spin.value(),
             lock_command=self._lock_cmd_edit.text().strip(),
             unlock_command=self._unlock_cmd_edit.text().strip(),
+            adapter_addresses=self._adapters_group.selected_addresses(),
         )
+
+    @property
+    def adapters_group(self) -> _AdaptersGroup:
+        return self._adapters_group
 
     def update_rssi(self, rssi: int) -> None:
         self._rssi_bar.setValue(max(_RSSI_MIN, min(_RSSI_MAX, rssi)))
@@ -256,6 +394,7 @@ class _DeviceTab(QWidget):
         idx = self._rssi_method_combo.findData(rssi_method)
         self._rssi_method_combo.setCurrentIndex(idx if idx >= 0 else 0)
         self._autostart_check.setChecked(_autostart_enabled())
+        self._adapters_group.set_configured(dev.adapter_addresses)
 
 
 class ConfigDialog(QDialog):
@@ -285,6 +424,7 @@ class ConfigDialog(QDialog):
         monitor.rssi_updated.connect(self._on_rssi_update)
         monitor.scan_result.connect(self._on_scan_result)
         monitor.scan_finished.connect(self._on_scan_finished)
+        monitor.adapters_changed.connect(self._on_adapters_changed)
 
     def current_config(self) -> Config:
         """Return a Config built from the current dialog state."""
@@ -365,6 +505,10 @@ class ConfigDialog(QDialog):
     def _on_rssi_update(self, rssi: int) -> None:
         if self._device_tab:
             self._device_tab.update_rssi(rssi)
+
+    def _on_adapters_changed(self) -> None:
+        if self._device_tab is not None:
+            self._device_tab.adapters_group.refresh()
 
     def _on_scan_clicked(self) -> None:
         self._scan_btn.setEnabled(False)
