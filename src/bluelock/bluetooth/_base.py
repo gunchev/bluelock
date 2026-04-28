@@ -15,16 +15,22 @@ class AbstractBluetoothMonitor(QObject):
     All signals are emitted on the Qt main thread.
     """
 
-    # Emitted whenever a new smoothed RSSI reading is available (dBm)
+    # Aggregated smoothed RSSI across all selected adapters (dBm)
     rssi_updated = pyqtSignal(int)
 
-    # Emitted when the target device becomes visible
+    # Per-adapter RSSI sample (adapter_address, dBm) — for UI debugging
+    adapter_rssi_updated = pyqtSignal(str, int)
+
+    # Emitted when the target device becomes visible on at least one selected adapter
     device_appeared = pyqtSignal()
 
-    # Emitted when the target device is no longer visible
+    # Emitted when the target device is no longer visible on any selected adapter
     device_disappeared = pyqtSignal()
 
-    # Emitted for each device found during a scan (mac, name)
+    # Emitted when the bound set of adapters changes (hot-plug, Powered toggle)
+    adapters_changed = pyqtSignal()
+
+    # Emitted for each device found during a scan
     scan_result = pyqtSignal(DeviceInfo)
 
     # Emitted when a scan completes or times out
@@ -37,8 +43,12 @@ class AbstractBluetoothMonitor(QObject):
         super().__init__(parent)
 
     @abstractmethod
-    def start_monitoring(self, mac: str) -> None:
-        """Begin RSSI monitoring for the device with the given MAC address."""
+    def start_monitoring(self, mac: str, adapter_addresses: list[str] | None = None) -> None:
+        """Begin RSSI monitoring for the device with the given MAC address.
+
+        *adapter_addresses* is a list of adapter BD addresses; an empty list
+        or None means "use all currently available adapters".
+        """
 
     @abstractmethod
     def stop_monitoring(self) -> None:

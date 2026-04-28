@@ -18,6 +18,8 @@ class DeviceConfig:
     unlock_duration: int = 4
     lock_command: str = ""
     unlock_command: str = ""
+    # Bluetooth adapter BD addresses to monitor on. Empty list = use all available adapters.
+    adapter_addresses: list[str] = dataclasses.field(default_factory=list)
 
 
 @dataclasses.dataclass
@@ -68,6 +70,10 @@ class Config:
     def unlock_command(self) -> str:
         return self.device.unlock_command if self.device else ""
 
+    @property
+    def adapter_addresses(self) -> list[str]:
+        return list(self.device.adapter_addresses) if self.device else []
+
     # ------------------------------------------------------------------
     # Paths
     # ------------------------------------------------------------------
@@ -109,6 +115,8 @@ class Config:
         # Current format: [device] single table with all fields
         d = data.get("device", {})
         if d.get("mac") and "lock_rssi" in d:
+            raw_adapters = d.get("adapter_addresses", [])
+            adapters = [str(a) for a in raw_adapters] if isinstance(raw_adapters, list) else []
             cfg.device = DeviceConfig(
                 mac=str(d["mac"]),
                 name=str(d.get("name", "")),
@@ -118,6 +126,7 @@ class Config:
                 unlock_duration=int(d.get("unlock_duration", 4)),
                 lock_command=str(d.get("lock_command", "")),
                 unlock_command=str(d.get("unlock_command", "")),
+                adapter_addresses=adapters,
             )
 
         # Backward compat: old [device] + [thresholds] + [commands] sections (pre-0.3)
@@ -172,6 +181,9 @@ def _to_toml(cfg: Config) -> str:
         lines.append(f"unlock_duration = {cfg.device.unlock_duration}")
         lines.append(f'lock_command = "{_escape(cfg.device.lock_command)}"')
         lines.append(f'unlock_command = "{_escape(cfg.device.unlock_command)}"')
+        if cfg.device.adapter_addresses:
+            joined = ", ".join(f'"{_escape(a)}"' for a in cfg.device.adapter_addresses)
+            lines.append(f"adapter_addresses = [{joined}]")
         lines.append("")
 
     return "\n".join(lines)

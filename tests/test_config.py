@@ -84,6 +84,46 @@ class TestConfigLoadSave:
         loaded = Config.load(tmp_config_path)
         assert loaded.lock_command == cmd
 
+    def test_adapter_addresses_round_trip(self, tmp_config_path):
+        c = Config(device=DeviceConfig(
+            mac="AA:BB:CC:DD:EE:FF",
+            adapter_addresses=["11:22:33:44:55:66", "AA:BB:CC:DD:EE:01"],
+        ))
+        c.save(tmp_config_path)
+        loaded = Config.load(tmp_config_path)
+        assert loaded.adapter_addresses == ["11:22:33:44:55:66", "AA:BB:CC:DD:EE:01"]
+        assert loaded.device.adapter_addresses == ["11:22:33:44:55:66", "AA:BB:CC:DD:EE:01"]
+
+    def test_adapter_addresses_empty_omitted_from_toml(self, tmp_config_path):
+        c = Config(device=DeviceConfig(mac="AA:BB:CC:DD:EE:FF"))
+        c.save(tmp_config_path)
+        text = tmp_config_path.read_text()
+        assert "adapter_addresses" not in text
+
+    def test_adapter_addresses_missing_in_legacy_config(self, tmp_config_path):
+        # An existing (pre-multi-adapter) config: no adapter_addresses key.
+        tmp_config_path.write_text(
+            '[device]\n'
+            'mac = "AA:BB:CC:DD:EE:FF"\n'
+            'lock_rssi = -20\n'
+            'lock_duration = 4\n'
+            'unlock_rssi = -10\n'
+            'unlock_duration = 4\n'
+        )
+        loaded = Config.load(tmp_config_path)
+        assert loaded.adapter_addresses == []
+
+    def test_adapter_addresses_non_list_falls_back_to_empty(self, tmp_config_path):
+        # Defensive: malformed config should not raise.
+        tmp_config_path.write_text(
+            '[device]\n'
+            'mac = "AA:BB:CC:DD:EE:FF"\n'
+            'lock_rssi = -20\n'
+            'adapter_addresses = "not-a-list"\n'
+        )
+        loaded = Config.load(tmp_config_path)
+        assert loaded.adapter_addresses == []
+
 
 class TestToToml:
     def test_string_values(self):

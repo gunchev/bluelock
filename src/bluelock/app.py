@@ -49,7 +49,7 @@ class BlueLockApp:
     def start(self) -> None:
         """Start monitoring and show the tray icon."""
         if self._config.device_mac:
-            self._monitor.start_monitoring(self._config.device_mac)
+            self._monitor.start_monitoring(self._config.device_mac, self._config.adapter_addresses)
             self._eval_timer.start()
         else:
             log.info("No device configured — opening preferences")
@@ -183,7 +183,7 @@ class BlueLockApp:
         self._processor.reset()
 
         if new_cfg.device_mac:
-            self._monitor.start_monitoring(new_cfg.device_mac)
+            self._monitor.start_monitoring(new_cfg.device_mac, new_cfg.adapter_addresses)
             self._eval_timer.start()
 
     def _quit(self) -> None:
