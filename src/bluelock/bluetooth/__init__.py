@@ -1,4 +1,5 @@
 """Bluetooth monitoring package."""
+from bluelock.bluetooth._adapters import AdapterInfo, list_adapters, resolve_addresses
 from bluelock.bluetooth._base import AbstractBluetoothMonitor
 from bluelock.bluetooth._types import DeviceInfo, mac_to_dbus_path, normalize_mac
 
@@ -11,8 +12,11 @@ def get_monitor() -> AbstractBluetoothMonitor:
 
 __all__ = [
     "AbstractBluetoothMonitor",
+    "AdapterInfo",
     "DeviceInfo",
     "get_monitor",
+    "list_adapters",
     "mac_to_dbus_path",
     "normalize_mac",
+    "resolve_addresses",
 ]
