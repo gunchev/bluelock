@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import logging
+import os
+import shutil
 import sys
 
 from PyQt6.QtCore import QTimer
@@ -224,8 +226,11 @@ def main() -> None:
     # so the running instance picks up the new code without user intervention.
     def _restart() -> None:
         log.info("Received SIGUSR1 — restarting to apply package update")
-        import os
-        os.execv(sys.argv[0], sys.argv)
+        exe = shutil.which(sys.argv[0])
+        if exe:
+            os.execv(exe, [exe] + sys.argv[1:])
+        else:
+            os.execv(sys.executable, [sys.executable, "-m", "bluelock"] + sys.argv[1:])
 
     signal.signal(signal.SIGUSR1, lambda *_: QTimer.singleShot(0, _restart))
 
