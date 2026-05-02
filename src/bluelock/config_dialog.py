@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import dataclasses
 import logging
-from pathlib import Path
 
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtWidgets import (
