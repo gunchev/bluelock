@@ -72,6 +72,8 @@ class ProximityStateMachine:
         effective_rssi = smoothed_rssi if device_present else float(NO_SIGNAL)
 
         if self._state == ProximityState.UNKNOWN:
+            if device_present and smoothed_rssi == float(NO_SIGNAL):
+                return None  # no readings yet; stay UNKNOWN until first real reading arrives
             return self._handle_unknown(effective_rssi)
         if self._state == ProximityState.ACTIVE:
             return self._handle_active(effective_rssi, device_present)

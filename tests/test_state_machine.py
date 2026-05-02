@@ -52,6 +52,17 @@ class TestInitialState:
         result = sm.evaluate(-5, device_present=True)
         assert result is not None
 
+    def test_no_signal_with_device_present_stays_unknown(self, sm):
+        from bluelock.signal_processor import NO_SIGNAL
+        result = sm.evaluate(float(NO_SIGNAL), device_present=True)
+        assert result is None
+        assert sm.state == ProximityState.UNKNOWN
+
+    def test_no_signal_without_device_sets_gone(self, sm):
+        from bluelock.signal_processor import NO_SIGNAL
+        result = sm.evaluate(float(NO_SIGNAL), device_present=False)
+        assert result == ProximityState.GONE
+
 
 class TestActiveToGone:
     def test_weak_signal_for_duration_locks(self, sm):
