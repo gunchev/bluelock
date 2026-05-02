@@ -78,7 +78,11 @@ def list_adapters(bus: QDBusConnection | None = None) -> list[AdapterInfo]:
     msg = QDBusMessage.createMethodCall(_BLUEZ_SVC, "/", _DBUS_OBJMGR_IFACE, "GetManagedObjects")
     reply = bus.call(msg)
     if reply.type() == QDBusMessage.MessageType.ErrorMessage:
-        log.warning("GetManagedObjects failed: %s", reply.errorMessage())
+        err = reply.errorMessage()
+        if "org.freedesktop.DBus.Error.ServiceUnknown" in err or "NoReply" in err:
+            log.warning("BlueZ is not running (GetManagedObjects: %s)", err)
+        else:
+            log.warning("GetManagedObjects failed: %s", err)
         return []
     args = reply.arguments()
     objects = args[0] if args else {}
