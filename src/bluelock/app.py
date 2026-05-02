@@ -5,6 +5,7 @@ import logging
 import os
 import shutil
 import sys
+import tomllib
 
 from PyQt6.QtCore import QTimer
 from PyQt6.QtWidgets import QApplication
@@ -27,7 +28,11 @@ class BlueLockApp:
         self._paused = False
         self._config_dialog = None
 
-        self._config = Config.load()
+        try:
+            self._config = Config.load()
+        except (tomllib.TOMLDecodeError, ValueError, TypeError) as exc:
+            log.warning("Config file has errors, using defaults: %s", exc)
+            self._config = Config()
         self._monitor = get_monitor()
         self._monitor.rssi_method = self._config.rssi_method
         self._processor = SignalProcessor(self._config.buffer_size)

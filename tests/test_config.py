@@ -1,5 +1,9 @@
 """Tests for bluelock.config."""
 
+import tomllib
+
+import pytest
+
 from bluelock.config import Config, DeviceConfig, _to_toml
 
 
@@ -53,10 +57,15 @@ class TestConfigLoadSave:
         loaded = Config.load(tmp_config_path)
         assert loaded == Config()
 
-    def test_corrupt_file_returns_defaults(self, tmp_config_path):
+    def test_corrupt_toml_raises(self, tmp_config_path):
         tmp_config_path.write_text("this is not valid toml }{")
-        loaded = Config.load(tmp_config_path)
-        assert loaded == Config()
+        with pytest.raises(tomllib.TOMLDecodeError):
+            Config.load(tmp_config_path)
+
+    def test_invalid_type_raises(self, tmp_config_path):
+        tmp_config_path.write_text('[advanced]\nbuffer_size = "abc"\n')
+        with pytest.raises((ValueError, TypeError)):
+            Config.load(tmp_config_path)
 
     def test_partial_config(self, tmp_config_path):
         tmp_config_path.write_text('[device]\nmac = "12:34:56:78:9A:BC"\n')

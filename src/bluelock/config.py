@@ -102,52 +102,52 @@ class Config:
             path = cls.config_path()
         try:
             data = tomllib.loads(path.read_text())
+        except OSError:
+            return cls()
 
-            advanced = data.get("advanced", {})
-            cfg = cls(
-                buffer_size=int(advanced.get("buffer_size", 16)),
-                scan_interval=float(advanced.get("scan_interval", 1.0)),
-                rssi_method=str(advanced.get("rssi_method", "auto")),
+        advanced = data.get("advanced", {})
+        cfg = cls(
+            buffer_size=int(advanced.get("buffer_size", 16)),
+            scan_interval=float(advanced.get("scan_interval", 1.0)),
+            rssi_method=str(advanced.get("rssi_method", "auto")),
+        )
+
+        # Current format: [device] single table with all fields
+        d = data.get("device", {})
+        if d.get("mac") and "lock_rssi" in d:
+            raw_adapters = d.get("adapter_addresses", [])
+            adapters = [str(a) for a in raw_adapters] if isinstance(raw_adapters, list) else []
+            cfg.device = DeviceConfig(
+                mac=str(d["mac"]),
+                name=str(d.get("name", "")),
+                lock_rssi_threshold=int(d.get("lock_rssi", -15)),
+                lock_duration=int(d.get("lock_duration", 4)),
+                unlock_rssi_threshold=int(d.get("unlock_rssi", -10)),
+                unlock_duration=int(d.get("unlock_duration", 4)),
+                lock_command=str(d.get("lock_command", "")),
+                unlock_command=str(d.get("unlock_command", "")),
+                adapter_addresses=adapters,
             )
 
-            # Current format: [device] single table with all fields
-            d = data.get("device", {})
-            if d.get("mac") and "lock_rssi" in d:
-                raw_adapters = d.get("adapter_addresses", [])
-                adapters = [str(a) for a in raw_adapters] if isinstance(raw_adapters, list) else []
+        # Backward compat: old [device] + [thresholds] + [commands] sections (pre-0.3)
+        if not cfg.device:
+            device = data.get("device", {})
+            thresholds = data.get("thresholds", {})
+            commands = data.get("commands", {})
+            mac = str(device.get("mac", ""))
+            if mac:
                 cfg.device = DeviceConfig(
-                    mac=str(d["mac"]),
-                    name=str(d.get("name", "")),
-                    lock_rssi_threshold=int(d.get("lock_rssi", -15)),
-                    lock_duration=int(d.get("lock_duration", 4)),
-                    unlock_rssi_threshold=int(d.get("unlock_rssi", -10)),
-                    unlock_duration=int(d.get("unlock_duration", 4)),
-                    lock_command=str(d.get("lock_command", "")),
-                    unlock_command=str(d.get("unlock_command", "")),
-                    adapter_addresses=adapters,
+                    mac=mac,
+                    name=str(device.get("name", "")),
+                    lock_rssi_threshold=int(thresholds.get("lock_rssi", -15)),
+                    lock_duration=int(thresholds.get("lock_duration", 4)),
+                    unlock_rssi_threshold=int(thresholds.get("unlock_rssi", -10)),
+                    unlock_duration=int(thresholds.get("unlock_duration", 4)),
+                    lock_command=str(commands.get("lock", "")),
+                    unlock_command=str(commands.get("unlock", "")),
                 )
 
-            # Backward compat: old [device] + [thresholds] + [commands] sections (pre-0.3)
-            if not cfg.device:
-                device = data.get("device", {})
-                thresholds = data.get("thresholds", {})
-                commands = data.get("commands", {})
-                mac = str(device.get("mac", ""))
-                if mac:
-                    cfg.device = DeviceConfig(
-                        mac=mac,
-                        name=str(device.get("name", "")),
-                        lock_rssi_threshold=int(thresholds.get("lock_rssi", -15)),
-                        lock_duration=int(thresholds.get("lock_duration", 4)),
-                        unlock_rssi_threshold=int(thresholds.get("unlock_rssi", -10)),
-                        unlock_duration=int(thresholds.get("unlock_duration", 4)),
-                        lock_command=str(commands.get("lock", "")),
-                        unlock_command=str(commands.get("unlock", "")),
-                    )
-
-            return cfg
-        except (OSError, tomllib.TOMLDecodeError, ValueError, TypeError):
-            return cls()
+        return cfg
 
     def save(self, path: Path | None = None) -> None:
         """Save config to TOML file, creating the directory if needed."""
