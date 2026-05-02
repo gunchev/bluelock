@@ -108,7 +108,7 @@ def resolve_addresses(addresses: list[str], adapters: list[AdapterInfo] | None =
             continue
         info = by_addr.get(addr)
         if info is None:
-            log.info("Configured adapter %s not currently present", addr)
+            log.warning("Configured adapter %s not currently present; skipping", addr)
             continue
         resolved.append(info)
     return resolved
