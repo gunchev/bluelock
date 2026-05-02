@@ -568,6 +568,12 @@ class BluezDBusMonitor(AbstractBluetoothMonitor):
     # ------------------------------------------------------------------ #
 
     def get_known_devices(self) -> list[DeviceInfo]:
+        """Return all devices currently known to BlueZ.
+
+        Deduplicates by MAC address; if the same device is visible on multiple
+        adapters only the first occurrence is returned. ``DeviceInfo`` has no
+        adapter field, so per-adapter visibility is not preserved.
+        """
         msg = QDBusMessage.createMethodCall(_BLUEZ_SVC, "/", _DBUS_OBJMGR_IFACE, "GetManagedObjects")
         reply = self._bus.call(msg)
         if reply.type() == QDBusMessage.MessageType.ErrorMessage:
