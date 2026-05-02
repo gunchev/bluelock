@@ -67,6 +67,15 @@ class TestConfigLoadSave:
         with pytest.raises((ValueError, TypeError)):
             Config.load(tmp_config_path)
 
+    def test_permission_error_raises(self, tmp_config_path):
+        tmp_config_path.write_text("")
+        tmp_config_path.chmod(0o000)
+        try:
+            with pytest.raises(PermissionError):
+                Config.load(tmp_config_path)
+        finally:
+            tmp_config_path.chmod(0o644)
+
     def test_partial_config(self, tmp_config_path):
         tmp_config_path.write_text('[device]\nmac = "12:34:56:78:9A:BC"\n')
         loaded = Config.load(tmp_config_path)

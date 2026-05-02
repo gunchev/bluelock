@@ -30,7 +30,7 @@ class BlueLockApp:
 
         try:
             self._config = Config.load()
-        except (tomllib.TOMLDecodeError, ValueError, TypeError) as exc:
+        except (OSError, tomllib.TOMLDecodeError, ValueError, TypeError) as exc:
             log.warning("Config file has errors, using defaults: %s", exc)
             self._config = Config()
         self._monitor = get_monitor()

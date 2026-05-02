@@ -102,7 +102,7 @@ class Config:
             path = cls.config_path()
         try:
             data = tomllib.loads(path.read_text())
-        except OSError:
+        except FileNotFoundError:
             return cls()
 
         advanced = data.get("advanced", {})
