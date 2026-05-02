@@ -209,47 +209,16 @@ class _AdaptersGroup(QGroupBox):
         self.selection_changed.emit()
 
 
-class _DeviceTab(QWidget):
-    """Per-device settings tab with signal display, thresholds, commands and a forget button."""
+class _GeneralSettingsTab(QWidget):
+    """General application settings tab (scan parameters, RSSI method, auto-start)."""
 
-    forget_requested = pyqtSignal(str)  # emits MAC address
-
-    def __init__(
-        self,
-        dev: DeviceConfig,
-        buffer_size: int = 16,
-        scan_interval: float = 1.0,
-        rssi_method: str = "auto",
-        parent: QWidget | None = None,
-    ) -> None:
+    def __init__(self, config: Config, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self._mac = dev.mac
-        self._name = dev.name
-
-        outer = QVBoxLayout(self)
-        outer.setContentsMargins(0, 0, 0, 0)
-
-        inner = QWidget()
-        layout = QVBoxLayout(inner)
-        layout.addWidget(self._build_signal_group())
-        layout.addWidget(self._build_thresholds_group())
-        layout.addWidget(self._build_commands_group())
-        self._adapters_group = _AdaptersGroup()
-        layout.addWidget(self._adapters_group)
-        layout.addWidget(self._build_advanced_group())
+        layout = QVBoxLayout(self)
+        layout.addWidget(self._build_scan_group())
+        layout.addWidget(self._build_application_group())
         layout.addStretch()
-
-        scroll = QScrollArea()
-        scroll.setWidget(inner)
-        scroll.setWidgetResizable(True)
-        scroll.setFrameShape(QScrollArea.Shape.NoFrame)
-        outer.addWidget(scroll, stretch=1)
-
-        forget_btn = QPushButton(f"Forget {dev.mac}")
-        forget_btn.clicked.connect(lambda: self.forget_requested.emit(self._mac))
-        outer.addWidget(forget_btn)
-
-        self._populate(dev, buffer_size, scan_interval, rssi_method)
+        self._populate(config)
 
     @property
     def buffer_size(self) -> int:
@@ -266,6 +235,77 @@ class _DeviceTab(QWidget):
     @property
     def autostart_enabled(self) -> bool:
         return self._autostart_check.isChecked()
+
+    def _build_scan_group(self) -> QGroupBox:
+        box = QGroupBox("Scan & Signal")
+        form = QFormLayout(box)
+        self._buffer_spin = QSpinBox()
+        self._buffer_spin.setRange(1, 255)
+        self._buffer_spin.setToolTip("Number of RSSI readings to average")
+        form.addRow("Buffer size:", self._buffer_spin)
+        self._interval_spin = QDoubleSpinBox()
+        self._interval_spin.setRange(0.5, 10.0)
+        self._interval_spin.setSingleStep(0.5)
+        self._interval_spin.setSuffix(" s")
+        self._interval_spin.setToolTip("How often to evaluate the lock/unlock state")
+        form.addRow("Scan interval:", self._interval_spin)
+        self._rssi_method_combo = QComboBox()
+        self._rssi_method_combo.addItem("Auto-detect (D-Bus → btmgmt → hcitool)", "auto")
+        self._rssi_method_combo.addItem("Force D-Bus only (no polling fallback)", "dbus")
+        self._rssi_method_combo.addItem("Force sudo btmgmt conn-info", "btmgmt")
+        self._rssi_method_combo.addItem("Force hcitool rssi", "hcitool")
+        self._rssi_method_combo.setToolTip("How to read RSSI when D-Bus updates are not available")
+        form.addRow("RSSI method:", self._rssi_method_combo)
+        return box
+
+    def _build_application_group(self) -> QGroupBox:
+        box = QGroupBox("Application")
+        form = QFormLayout(box)
+        self._autostart_check = QCheckBox("Start BlueLock automatically on login")
+        form.addRow("Auto-start:", self._autostart_check)
+        return box
+
+    def _populate(self, config: Config) -> None:
+        self._buffer_spin.setValue(config.buffer_size)
+        self._interval_spin.setValue(config.scan_interval)
+        idx = self._rssi_method_combo.findData(config.rssi_method)
+        self._rssi_method_combo.setCurrentIndex(idx if idx >= 0 else 0)
+        self._autostart_check.setChecked(_autostart_enabled())
+
+
+class _DeviceTab(QWidget):
+    """Per-device settings tab with signal display, thresholds, commands and a forget button."""
+
+    forget_requested = pyqtSignal(str)  # emits MAC address
+
+    def __init__(self, dev: DeviceConfig, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self._mac = dev.mac
+        self._name = dev.name
+
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+
+        inner = QWidget()
+        layout = QVBoxLayout(inner)
+        layout.addWidget(self._build_signal_group())
+        layout.addWidget(self._build_thresholds_group())
+        layout.addWidget(self._build_commands_group())
+        self._adapters_group = _AdaptersGroup()
+        layout.addWidget(self._adapters_group)
+        layout.addStretch()
+
+        scroll = QScrollArea()
+        scroll.setWidget(inner)
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        outer.addWidget(scroll, stretch=1)
+
+        forget_btn = QPushButton(f"Forget {dev.mac}")
+        forget_btn.clicked.connect(lambda: self.forget_requested.emit(self._mac))
+        outer.addWidget(forget_btn)
+
+        self._populate(dev)
 
     def to_device_config(self) -> DeviceConfig:
         return DeviceConfig(
@@ -355,31 +395,7 @@ class _DeviceTab(QWidget):
         form.addRow("Unlock command:", self._unlock_cmd_edit)
         return box
 
-    def _build_advanced_group(self) -> QGroupBox:
-        box = QGroupBox("Advanced")
-        form = QFormLayout(box)
-        self._buffer_spin = QSpinBox()
-        self._buffer_spin.setRange(1, 255)
-        self._buffer_spin.setToolTip("Number of RSSI readings to average")
-        form.addRow("Buffer size:", self._buffer_spin)
-        self._interval_spin = QDoubleSpinBox()
-        self._interval_spin.setRange(0.5, 10.0)
-        self._interval_spin.setSingleStep(0.5)
-        self._interval_spin.setSuffix(" s")
-        self._interval_spin.setToolTip("How often to evaluate the lock/unlock state")
-        form.addRow("Scan interval:", self._interval_spin)
-        self._rssi_method_combo = QComboBox()
-        self._rssi_method_combo.addItem("Auto-detect (D-Bus → btmgmt → hcitool)", "auto")
-        self._rssi_method_combo.addItem("Force D-Bus only (no polling fallback)", "dbus")
-        self._rssi_method_combo.addItem("Force sudo btmgmt conn-info", "btmgmt")
-        self._rssi_method_combo.addItem("Force hcitool rssi", "hcitool")
-        self._rssi_method_combo.setToolTip("How to read RSSI when D-Bus updates are not available")
-        form.addRow("RSSI method:", self._rssi_method_combo)
-        self._autostart_check = QCheckBox("Start BlueLock automatically on login")
-        form.addRow("Auto-start:", self._autostart_check)
-        return box
-
-    def _populate(self, dev: DeviceConfig, buffer_size: int, scan_interval: float, rssi_method: str = "auto") -> None:
+    def _populate(self, dev: DeviceConfig) -> None:
         self._lock_rssi_spin.setValue(dev.lock_rssi_threshold)
         self._lock_rssi_slider.setValue(dev.lock_rssi_threshold)
         self._lock_dur_spin.setValue(dev.lock_duration)
@@ -388,11 +404,6 @@ class _DeviceTab(QWidget):
         self._unlock_dur_spin.setValue(dev.unlock_duration)
         self._lock_cmd_edit.setText(dev.lock_command)
         self._unlock_cmd_edit.setText(dev.unlock_command)
-        self._buffer_spin.setValue(buffer_size)
-        self._interval_spin.setValue(scan_interval)
-        idx = self._rssi_method_combo.findData(rssi_method)
-        self._rssi_method_combo.setCurrentIndex(idx if idx >= 0 else 0)
-        self._autostart_check.setChecked(_autostart_enabled())
         self._adapters_group.set_configured(dev.adapter_addresses)
 
 
@@ -407,11 +418,12 @@ class ConfigDialog(QDialog):
         self._monitor = None
         self._scan_results: dict[str, DeviceInfo] = {}
         self._device_tab: _DeviceTab | None = None
+        self._general_tab = _GeneralSettingsTab(config)
 
         self._build_ui()
 
         if config.device:
-            self._set_device_tab(config.device, config.buffer_size, config.scan_interval, config.rssi_method)
+            self._set_device_tab(config.device)
 
     # ------------------------------------------------------------------ #
     # Public                                                               #
@@ -429,9 +441,9 @@ class ConfigDialog(QDialog):
         """Return a Config built from the current dialog state."""
         return Config(
             device=self._device_tab.to_device_config() if self._device_tab else None,
-            buffer_size=self._device_tab.buffer_size if self._device_tab else 16,
-            scan_interval=self._device_tab.scan_interval if self._device_tab else 1.0,
-            rssi_method=self._device_tab.rssi_method if self._device_tab else "auto",
+            buffer_size=self._general_tab.buffer_size,
+            scan_interval=self._general_tab.scan_interval,
+            rssi_method=self._general_tab.rssi_method,
         )
 
     # ------------------------------------------------------------------ #
@@ -441,6 +453,7 @@ class ConfigDialog(QDialog):
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
         self._tabs = QTabWidget()
+        self._tabs.addTab(self._general_tab, "General Settings")
         self._tabs.addTab(self._build_scanner_tab(), "Devices")
         layout.addWidget(self._tabs)
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
@@ -483,17 +496,15 @@ class ConfigDialog(QDialog):
 
         return tab
 
-    def _set_device_tab(
-        self, dev: DeviceConfig, buffer_size: int = 16, scan_interval: float = 1.0, rssi_method: str = "auto"
-    ) -> int:
-        """Create or update the settings tab for *dev*, lock the Device tab, and return the index."""
+    def _set_device_tab(self, dev: DeviceConfig) -> int:
+        """Create or update the device settings tab for *dev*, lock the Devices tab, and return the index."""
         if self._device_tab:
-            self._tabs.removeTab(1)
+            self._tabs.removeTab(2)
 
-        self._device_tab = _DeviceTab(dev, buffer_size, scan_interval, rssi_method)
+        self._device_tab = _DeviceTab(dev)
         self._device_tab.forget_requested.connect(self._on_forget)
-        idx = self._tabs.addTab(self._device_tab, "Settings")
-        self._tabs.setTabEnabled(0, False)
+        idx = self._tabs.addTab(self._device_tab, "Device Settings")
+        self._tabs.setTabEnabled(1, False)
         self._tabs.setCurrentIndex(idx)
         return idx
 
@@ -536,7 +547,7 @@ class ConfigDialog(QDialog):
 
     def _on_accept(self) -> None:
         try:
-            _set_autostart(self._device_tab.autostart_enabled if self._device_tab else False)
+            _set_autostart(self._general_tab.autostart_enabled)
         except OSError as e:
             log.warning("Could not update autostart entry: %s", e)
         self.accept()
@@ -560,10 +571,10 @@ class ConfigDialog(QDialog):
         self._set_device_tab(DeviceConfig(mac=mac, name=name))
 
     def _on_forget(self, mac: str) -> None:
-        """Remove the device tab and unlock the Device tab."""
+        """Remove the device settings tab and unlock the Devices tab."""
         if self._device_tab is None:
             return
         self._device_tab = None
-        self._tabs.removeTab(1)
-        self._tabs.setTabEnabled(0, True)
-        self._tabs.setCurrentIndex(0)
+        self._tabs.removeTab(2)
+        self._tabs.setTabEnabled(1, True)
+        self._tabs.setCurrentIndex(1)
