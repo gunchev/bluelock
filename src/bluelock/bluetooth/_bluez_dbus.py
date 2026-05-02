@@ -75,6 +75,8 @@ class BluezDBusMonitor(AbstractBluetoothMonitor):
         # Populated at monitoring start and via InterfacesAdded; used by
         # _on_adapter_props_changed so it can pass the address to _handle_powered.
         self._adapter_path_to_address: dict[str, str] = {}
+        # Device D-Bus path → adapter BD address; O(1) reverse lookup for PropertiesChanged.
+        self._device_path_to_addr: dict[str, str] = {}
         # Aggregate presence for edge-triggered appeared/disappeared.
         self._aggregate_present: bool = False
         # Adapters used while scanning (may overlap with monitored ones).
@@ -218,6 +220,8 @@ class BluezDBusMonitor(AbstractBluetoothMonitor):
         device_path = mac_to_dbus_path(ainfo.path, self._target_mac) if self._target_mac else ""
         state = _AdapterState(info=ainfo, device_path=device_path)
         self._adapter_states[ainfo.address] = state
+        if device_path:
+            self._device_path_to_addr[device_path] = ainfo.address
         log.info("Binding adapter %s (%s)", ainfo.address, ainfo.path)
 
         if device_path:
@@ -231,6 +235,8 @@ class BluezDBusMonitor(AbstractBluetoothMonitor):
         if state is None:
             return
         log.info("Unbinding adapter %s%s", address, " (gone)" if adapter_gone else "")
+        if state.device_path:
+            self._device_path_to_addr.pop(state.device_path, None)
         if not adapter_gone:
             if state.discovery_started:
                 self._stop_discovery(state.info.path)
@@ -430,11 +436,8 @@ class BluezDBusMonitor(AbstractBluetoothMonitor):
     # ------------------------------------------------------------------ #
 
     def _adapter_address_for_device_path(self, device_path: str) -> str:
-        """Return the adapter BD address whose path is the parent of *device_path*."""
-        for addr, state in self._adapter_states.items():
-            if state.device_path and device_path == state.device_path:
-                return addr
-        return ""
+        """Return the adapter BD address whose device path matches *device_path*."""
+        return self._device_path_to_addr.get(device_path, "")
 
     @pyqtSlot('QDBusMessage')
     def _on_properties_changed(self, msg: QDBusMessage) -> None:
@@ -503,7 +506,10 @@ class BluezDBusMonitor(AbstractBluetoothMonitor):
                 # Find which adapter this device belongs to by path prefix.
                 for addr, state in self._adapter_states.items():
                     if path.startswith(state.info.path + "/"):
+                        if state.device_path:
+                            self._device_path_to_addr.pop(state.device_path, None)
                         state.device_path = path
+                        self._device_path_to_addr[path] = addr
                         self._connect_device_signals(path)
                         if rssi is not None:
                             self._handle_rssi(addr, int(rssi), source="dbus")
