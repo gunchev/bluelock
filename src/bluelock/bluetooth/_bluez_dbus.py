@@ -71,6 +71,10 @@ class BluezDBusMonitor(AbstractBluetoothMonitor):
         self._selected_addresses: list[str] = []
         # Bound adapter state, keyed by adapter BD address.
         self._adapter_states: dict[str, _AdapterState] = {}
+        # All adapter paths known to BlueZ (incl. unselected/unpowered) → BD address.
+        # Populated at monitoring start and via InterfacesAdded; used by
+        # _on_adapter_props_changed so it can pass the address to _handle_powered.
+        self._adapter_path_to_address: dict[str, str] = {}
         # Aggregate presence for edge-triggered appeared/disappeared.
         self._aggregate_present: bool = False
         # Adapters used while scanning (may overlap with monitored ones).
@@ -110,6 +114,7 @@ class BluezDBusMonitor(AbstractBluetoothMonitor):
                  mac, self._selected_addresses or "all")
 
         self._connect_object_manager_signals()
+        self._start_adapter_watching()
 
         adapters = self._resolve_initial_adapters()
         if not adapters:
@@ -126,6 +131,7 @@ class BluezDBusMonitor(AbstractBluetoothMonitor):
         self._stale_timer.stop()
         for addr in list(self._adapter_states.keys()):
             self._unbind_adapter(addr)
+        self._stop_adapter_watching()
         if not self._scanning:
             self._disconnect_object_manager_signals()
         self._monitoring = False
@@ -230,7 +236,6 @@ class BluezDBusMonitor(AbstractBluetoothMonitor):
                 self._stop_discovery(state.info.path)
             if state.device_path:
                 self._disconnect_device_signals(state.device_path)
-            self._disconnect_adapter_props(state.info.path)
         self._recompute_aggregate()
         self.adapters_changed.emit()
 
@@ -353,6 +358,24 @@ class BluezDBusMonitor(AbstractBluetoothMonitor):
     def _disconnect_adapter_props(self, path: str) -> None:
         self._bus.disconnect(_BLUEZ_SVC, path, _DBUS_PROPS_IFACE, "PropertiesChanged", self._on_adapter_props_changed)
 
+    def _start_adapter_watching(self) -> None:
+        """Subscribe to PropertiesChanged for all currently-known adapters and build the path→address cache.
+
+        Called once at monitoring start so that power-on signals are received even for
+        adapters that were unpowered or unselected at startup.
+        """
+        for ainfo in list_adapters(self._bus):
+            if not ainfo.path:
+                continue
+            if ainfo.address:
+                self._adapter_path_to_address[ainfo.path] = ainfo.address
+            self._connect_adapter_props(ainfo.path)
+
+    def _stop_adapter_watching(self) -> None:
+        for path in list(self._adapter_path_to_address):
+            self._disconnect_adapter_props(path)
+        self._adapter_path_to_address.clear()
+
     # ------------------------------------------------------------------ #
     # BlueZ adapter control                                                #
     # ------------------------------------------------------------------ #
@@ -439,7 +462,8 @@ class BluezDBusMonitor(AbstractBluetoothMonitor):
         changed = args[1] if len(args) > 1 else {}
         if "Powered" not in changed:
             return
-        self._handle_powered(msg.path(), bool(changed["Powered"]))
+        address = self._adapter_path_to_address.get(msg.path(), "")
+        self._handle_powered(msg.path(), bool(changed["Powered"]), address=address)
 
     @pyqtSlot('QDBusMessage')
     def _on_interfaces_added(self, msg: QDBusMessage) -> None:
@@ -458,6 +482,10 @@ class BluezDBusMonitor(AbstractBluetoothMonitor):
                 alias=str(props.get("Alias", "")),
                 powered=bool(props.get("Powered", False)),
             )
+            if address:
+                self._adapter_path_to_address[path] = address
+            if self._monitoring:
+                self._connect_adapter_props(path)
             self._handle_adapter_added(ainfo)
 
         if _BLUEZ_DEVICE_IFACE in interfaces:
@@ -489,6 +517,8 @@ class BluezDBusMonitor(AbstractBluetoothMonitor):
         path = str(args[0])
         interfaces = args[1]
         if _BLUEZ_ADAPTER_IFACE in interfaces:
+            self._adapter_path_to_address.pop(path, None)
+            self._disconnect_adapter_props(path)
             self._handle_adapter_removed(path)
             return
         if _BLUEZ_DEVICE_IFACE in interfaces and self._monitoring:

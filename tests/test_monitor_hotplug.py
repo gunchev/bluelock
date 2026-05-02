@@ -104,6 +104,21 @@ def test_adapter_added_unpowered_deferred(monitor, mocker):
     assert {a.address for a in monitor.bound_adapters} == {ADDR1, ADDR2}
 
 
+def test_powered_on_signal_rebinds_via_cache(monitor, mocker):
+    """_on_adapter_props_changed must resolve the address from _adapter_path_to_address."""
+    available = [_ainfo(ADDR1, "hci0"), _ainfo(ADDR2, "hci1", powered=False)]
+    _start(monitor, mocker, selected=[], available=available)
+    assert {a.address for a in monitor.bound_adapters} == {ADDR1}
+    # Cache is populated for both adapters including the unpowered one.
+    assert monitor._adapter_path_to_address.get("/org/bluez/hci1") == ADDR2
+
+    msg = mocker.MagicMock()
+    msg.path.return_value = "/org/bluez/hci1"
+    msg.arguments.return_value = ["org.bluez.Adapter1", {"Powered": True}, []]
+    monitor._on_adapter_props_changed(msg)
+    assert {a.address for a in monitor.bound_adapters} == {ADDR1, ADDR2}
+
+
 def test_adapter_removed_unbinds(monitor, mocker):
     _start(monitor, mocker, selected=[])
     assert ADDR1 in {a.address for a in monitor.bound_adapters}
