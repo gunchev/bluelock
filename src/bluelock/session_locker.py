@@ -224,6 +224,9 @@ class ScreenSaverInhibitor:
                         self._cookie = int(parts[1])
                         log.info("Screensaver inhibited via dbus-send (cookie=%s)", self._cookie)
                         return
+                # Inhibit succeeded but cookie is unreadable; store 0 so uninhibit()
+                # still fires and resets state (the UnInhibit call will fail harmlessly).
+                self._cookie = 0
                 log.warning("ScreenSaver.Inhibit (dbus-send) succeeded but no uint32 cookie in output: %r",
                             result.stdout.strip())
             else:

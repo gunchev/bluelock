@@ -177,14 +177,16 @@ class TestInhibitorSubprocess:
 
         assert not inh.active
 
-    def test_inhibit_missing_uint32_in_output_warns_and_no_cookie(self, caplog):
+    def test_inhibit_missing_uint32_in_output_warns_and_stores_sentinel(self, caplog):
         result = MagicMock(returncode=0, stdout="method return\n   string unexpected\n", stderr="")
         with patch("subprocess.run", return_value=result):
             inh = self._make_inh()
             with caplog.at_level("WARNING"):
                 inh.inhibit()
 
-        assert not inh.active
+        # Sentinel 0 is stored so uninhibit() fires and resets state.
+        assert inh.active
+        assert inh._cookie == 0
         assert "no uint32 cookie" in caplog.text
 
     def test_inhibit_subprocess_exception_does_not_raise(self):
