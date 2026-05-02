@@ -63,38 +63,43 @@ def test_parse_adapters_returns_empty_for_no_adapters():
 
 def test_resolve_addresses_empty_returns_all():
     adapters = _parse_adapters(_make_objects())
-    resolved = resolve_addresses([], adapters=adapters)
+    resolved, missing = resolve_addresses([], adapters=adapters)
     assert resolved == adapters
+    assert missing == []
 
 
 def test_resolve_addresses_filters_and_preserves_order():
     adapters = _parse_adapters(_make_objects())
-    resolved = resolve_addresses(
+    resolved, missing = resolve_addresses(
         ["AA:BB:CC:DD:EE:02", "AA:BB:CC:DD:EE:01"],
         adapters=adapters,
     )
     assert [a.address for a in resolved] == ["AA:BB:CC:DD:EE:02", "AA:BB:CC:DD:EE:01"]
+    assert missing == []
 
 
-def test_resolve_addresses_drops_missing():
+def test_resolve_addresses_reports_missing():
     adapters = _parse_adapters(_make_objects())
-    resolved = resolve_addresses(
+    resolved, missing = resolve_addresses(
         ["AA:BB:CC:DD:EE:01", "DE:AD:BE:EF:00:00"],
         adapters=adapters,
     )
     assert [a.address for a in resolved] == ["AA:BB:CC:DD:EE:01"]
+    assert missing == ["DE:AD:BE:EF:00:00"]
 
 
 def test_resolve_addresses_normalises_input():
     adapters = _parse_adapters(_make_objects())
-    resolved = resolve_addresses(["aa-bb-cc-dd-ee-01"], adapters=adapters)
+    resolved, missing = resolve_addresses(["aa-bb-cc-dd-ee-01"], adapters=adapters)
     assert [a.address for a in resolved] == ["AA:BB:CC:DD:EE:01"]
+    assert missing == []
 
 
 def test_resolve_addresses_skips_invalid():
     adapters = _parse_adapters(_make_objects())
-    resolved = resolve_addresses(["not-a-mac", "AA:BB:CC:DD:EE:01"], adapters=adapters)
+    resolved, missing = resolve_addresses(["not-a-mac", "AA:BB:CC:DD:EE:01"], adapters=adapters)
     assert [a.address for a in resolved] == ["AA:BB:CC:DD:EE:01"]
+    assert missing == []
 
 
 def test_adapter_info_hci_name_blank_path():

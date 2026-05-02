@@ -207,7 +207,7 @@ class BluezDBusMonitor(AbstractBluetoothMonitor):
 
     def _resolve_initial_adapters(self) -> list[AdapterInfo]:
         all_adapters = list_adapters(self._bus)
-        resolved = resolve_addresses(self._selected_addresses, adapters=all_adapters)
+        resolved, _missing = resolve_addresses(self._selected_addresses, adapters=all_adapters)
         # Skip adapters that are unpowered or have no usable address.
         return [a for a in resolved if a.address and a.powered]
 

@@ -89,22 +89,28 @@ def list_adapters(bus: QDBusConnection | None = None) -> list[AdapterInfo]:
     return _parse_adapters(objects)
 
 
-def resolve_addresses(addresses: list[str], adapters: list[AdapterInfo] | None = None) -> list[AdapterInfo]:
-    """Return adapters matching *addresses* (BD_ADDRs), preserving the request order.
+def resolve_addresses(
+    addresses: list[str], adapters: list[AdapterInfo] | None = None
+) -> tuple[list[AdapterInfo], list[str]]:
+    """Return ``(resolved, missing)`` for *addresses* (BD_ADDRs), preserving the request order.
 
-    Empty *addresses* means "use all available adapters". Configured-but-missing
-    addresses are logged and silently dropped — the user will see this in the
-    config dialog when they refresh.
+    *resolved* contains the matching ``AdapterInfo`` objects; *missing* contains the
+    normalised MAC strings for addresses that were valid but not currently present.
+    Invalid MAC strings are logged and excluded from both lists.
+
+    Empty *addresses* means "use all available adapters"; *missing* is always ``[]``
+    in that case.
 
     *adapters* may be passed for testing; otherwise ``list_adapters()`` is called.
     """
     if adapters is None:
         adapters = list_adapters()
     if not addresses:
-        return list(adapters)
+        return list(adapters), []
 
     by_addr = {a.address: a for a in adapters if a.address}
     resolved: list[AdapterInfo] = []
+    missing: list[str] = []
     for raw in addresses:
         addr = normalize_mac(raw)
         if not addr:
@@ -113,6 +119,7 @@ def resolve_addresses(addresses: list[str], adapters: list[AdapterInfo] | None =
         info = by_addr.get(addr)
         if info is None:
             log.warning("Configured adapter %s not currently present; skipping", addr)
+            missing.append(addr)
             continue
         resolved.append(info)
-    return resolved
+    return resolved, missing
