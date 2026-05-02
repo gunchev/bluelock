@@ -93,6 +93,9 @@ class BlueLockApp:
                               self._config.device_name, paused=True)
             return
 
+        if self._device_present and not self._processor.has_readings:
+            return
+
         prev_state = self._machine.state
         new_state = self._machine.evaluate(self._processor.smoothed_rssi, self._device_present)
 
