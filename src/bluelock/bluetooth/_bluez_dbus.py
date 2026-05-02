@@ -142,6 +142,13 @@ class BluezDBusMonitor(AbstractBluetoothMonitor):
         self._aggregate_present = False
 
     def start_scan(self, timeout_ms: int = 10_000) -> None:
+        """Start a device-discovery scan.
+
+        Intentionally scans ALL powered adapters regardless of the
+        ``adapter_addresses`` selection passed to ``start_monitoring``; the goal
+        is to discover every reachable device, not just those on monitored
+        adapters.
+        """
         if self._scanning:
             return
         log.info("Starting device scan (timeout=%dms)", timeout_ms)
