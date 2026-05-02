@@ -68,22 +68,6 @@ If the same device is visible on multiple adapters, only the first occurrence is
 `DeviceInfo` type has no adapter field, so per-adapter device visibility is lost. Not a bug but
 a limitation if per-adapter device discovery is ever needed. Documented in the docstring.
 
-#### `_adapters.py` has wrong D-Bus interface name
-
-- **File:** `src/bluelock/bluetooth/_adapters.py`
-- **Line:** `15`
-
-`_DBUS_OBJMGR_IFACE = "org.freedesktop.DBus.ObjectManager"` has a typo: it says
-`freedesktop` instead of `freedesktop` (missing an 'e' in "freedesktop").
-Wait, that's actually correct... Let me re-check.
-
-Actually, the correct D-Bus interface is `org.freedesktop.DBus.ObjectManager`.
-The code has `org.freedesktop.DBus.ObjectManager` which matches. However,
-`list_adapters()` uses this constant and if it's wrong, `GetManagedObjects`
-calls will fail. Testing indicates this works, so maybe I misread.
-
-**Update:** After re-checking, the string appears correct. Disregard this item.
-
 #### `config_dialog.py` autostart file path doesn't respect XDG_CONFIG_HOME
 
 - **File:** `src/bluelock/config_dialog.py`
