@@ -321,6 +321,8 @@ class BluezDBusMonitor(AbstractBluetoothMonitor):
             if state.info.path == path:
                 if not powered:
                     self._unbind_adapter(addr)
+                elif not state.info.powered:
+                    state.info = dataclasses.replace(state.info, powered=True)
                 return
         if powered and self._monitoring and address and self._is_selected(address):
             ainfo = AdapterInfo(address=address, path=path, alias=alias, powered=True)
