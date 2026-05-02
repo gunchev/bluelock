@@ -1,3 +1,32 @@
+## 0.5.0 — 2026-05-03
+
+### Changes since v0.4.2
+
+- 4b0b0de Narrow OSError catch to FileNotFoundError in config.load()
+- 9fb7c56 Let config parse errors propagate; log and fall back in app.py
+- 41ce2b1 Skip state evaluation in app._evaluate() when device present but no readings
+- 1d6ede1 Skip UNKNOWN→GONE transition when device present but no readings yet
+- 89707c8 Fall back to defaults on type conversion errors in config.load()
+- 386636f Fix autostart path to respect XDG_CONFIG_HOME
+- eaf1ceb MiniMax M2.5 Free OpenCode Zen removes bogus bug.
+- 69c0c64 Bugs by Hy3 preview Free OpenCode Zen
+- 8cec2a9 Drop solved bugs.
+- dad1499 Update BUGS.md: mark three bugs fixed, annotate zombie-state bug
+- 6a8e5f5 Resolve SIGUSR1 re-exec path via shutil.which with module fallback
+- 3cd10d6 Store sentinel cookie 0 when dbus-send inhibit output is unparseable
+- 85a54d9 Return (resolved, missing) tuple from resolve_addresses
+- 0f5e2a8 Distinguish BlueZ-not-running from other GetManagedObjects failures
+- 426e5ad Retry StartDiscovery on NotPowered in addition to NotReady
+- 24415b6 Raise log level for missing configured adapters from INFO to WARNING
+- d93a329 Document get_known_devices deduplication by MAC limitation
+- eb16e54 Document that start_scan scans all adapters regardless of selection
+- 849a873 Replace linear scan in _adapter_address_for_device_path with O(1) dict
+- 3125bf9 Fix stale AdapterInfo.powered after power toggle
+- e331b6e Fix unpowered adapter never re-binds when powered on
+- f30dd59 Multiadapter PR3
+- 4cdf158 MultiAdapter PR2
+- c804fa6 Multiadapter PR1
+
 ## 0.4.2 — 2026-04-11
 
 ### Changes since v0.4.1
