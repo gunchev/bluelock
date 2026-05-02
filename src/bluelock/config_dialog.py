@@ -40,7 +40,7 @@ from bluelock.bluetooth._types import DeviceInfo, normalize_mac
 from bluelock.config import Config, DeviceConfig
 from bluelock.signal_processor import estimate_distance_m
 
-_AUTOSTART_FILE = Path.home() / ".config" / "autostart" / "bluelock.desktop"
+_AUTOSTART_FILE = Config.config_dir().parent / "autostart" / "bluelock.desktop"
 _AUTOSTART_CONTENT = """\
 [Desktop Entry]
 Type=Application
