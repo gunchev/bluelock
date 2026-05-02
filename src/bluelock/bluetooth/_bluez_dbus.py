@@ -405,8 +405,8 @@ class BluezDBusMonitor(AbstractBluetoothMonitor):
                 if on_state is not None:
                     on_state.discovery_started = True
                 return
-            if "NotReady" in err and on_state is not None:
-                log.debug("StartDiscovery on %s: NotReady, retrying in %dms", adapter_path, _DISCOVERY_RETRY_MS)
+            if any(t in err for t in ("NotReady", "NotPowered")) and on_state is not None:
+                log.debug("StartDiscovery on %s: %s, retrying in %dms", adapter_path, err, _DISCOVERY_RETRY_MS)
                 QTimer.singleShot(_DISCOVERY_RETRY_MS,
                                   lambda: self._retry_start_discovery(adapter_path, on_state))
                 return
