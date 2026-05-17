@@ -1,3 +1,10 @@
+## 0.6.0 — 2026-05-17
+
+### Changes since v0.5.0
+
+- 4ee745e Add RSSI history plot with per-adapter graph and hover tooltips
+- 583d845 Split config dialog into General Settings and Device Settings tabs
+
 ## 0.5.0 — 2026-05-03
 
 ### Changes since v0.4.2
