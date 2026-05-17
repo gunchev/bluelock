@@ -1,3 +1,9 @@
+## 0.6.1 — 2026-05-17
+
+### Changes since v0.6.0
+
+- 32b63d9 Show data point markers on RSSI history plot
+
 ## 0.6.0 — 2026-05-17
 
 ### Changes since v0.5.0
