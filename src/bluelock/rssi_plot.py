@@ -24,7 +24,7 @@ _PALETTE = [
     QColor("#8c564b"),
 ]
 
-_WINDOW_OPTIONS = [("5 min", 300), ("15 min", 900)]
+_WINDOW_OPTIONS = [("5 min", 300), ("15 min", 900), ("1 hour", 3600)]
 
 
 class RssiPlot(QWidget):
@@ -143,6 +143,8 @@ class RssiPlot(QWidget):
                 pen.setColor(color)
                 pen.setWidth(2)
                 series.setPen(pen)
+                series.setPointsVisible(True)
+                series.setMarkerSize(6)
                 self._chart.addSeries(series)
                 series.attachAxis(self._axis_x)
                 series.attachAxis(self._axis_y)
