@@ -299,7 +299,7 @@ class BluezDBusMonitor(AbstractBluetoothMonitor):
                 state.poll_tool = tool
         state.latest_rssi = int(rssi)
         state.latest_ts = self._clock()
-        self.adapter_rssi_updated.emit(address, int(rssi))
+        self.adapter_rssi_updated.emit(address, int(rssi), source)
         self._recompute_aggregate()
 
     def _handle_connected(self, address: str, connected: bool) -> None:

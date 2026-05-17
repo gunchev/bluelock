@@ -52,7 +52,7 @@ def captured(monitor):
         "disappeared": 0,
     }
     monitor.rssi_updated.connect(lambda v: rec["rssi"].append(v))
-    monitor.adapter_rssi_updated.connect(lambda a, v: rec["per_adapter"].append((a, v)))
+    monitor.adapter_rssi_updated.connect(lambda a, v, s: rec["per_adapter"].append((a, v)))
     monitor.device_appeared.connect(lambda: rec.update(appeared=rec["appeared"] + 1))
     monitor.device_disappeared.connect(lambda: rec.update(disappeared=rec["disappeared"] + 1))
     return rec

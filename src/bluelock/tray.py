@@ -48,6 +48,7 @@ class TrayIcon(QObject):
     """
 
     preferences_requested = pyqtSignal()
+    rssi_plot_requested = pyqtSignal()
     pause_toggled = pyqtSignal(bool)
     quit_requested = pyqtSignal()
 
@@ -91,6 +92,9 @@ class TrayIcon(QObject):
 
         act_prefs = menu.addAction("Preferences…")
         act_prefs.triggered.connect(self.preferences_requested)
+
+        act_plot = menu.addAction("RSSI graph…")
+        act_plot.triggered.connect(self.rssi_plot_requested)
 
         self._pause_action = menu.addAction("Pause")
         self._pause_action.setCheckable(True)

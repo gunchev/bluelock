@@ -3,12 +3,20 @@ from __future__ import annotations
 
 import dataclasses
 import logging
+import pathlib
 
 from PyQt6.QtDBus import QDBusConnection, QDBusMessage
 
 from bluelock.bluetooth._types import normalize_mac
 
 log = logging.getLogger(__name__)
+
+_HCI_VERSIONS: dict[int, str] = {
+    6: "4.0", 7: "4.1", 8: "4.2", 9: "5.0",
+    10: "5.1", 11: "5.2", 12: "5.3", 13: "5.4",
+}
+
+_SYS_BT = pathlib.Path("/sys/class/bluetooth")
 
 _BLUEZ_SVC = "org.bluez"
 _BLUEZ_ADAPTER_IFACE = "org.bluez.Adapter1"
@@ -123,3 +131,17 @@ def resolve_addresses(
             continue
         resolved.append(info)
     return resolved, missing
+
+
+def hci_version(hci_name: str) -> str | None:
+    """Return the Bluetooth version string for *hci_name* (e.g. ``"5.3"``), or ``None``.
+
+    Reads ``/sys/class/bluetooth/<hci_name>/hci_version`` without spawning a
+    subprocess.  Returns ``None`` if the sysfs file is missing or the byte value
+    is not in the known table.
+    """
+    try:
+        raw = (_SYS_BT / hci_name / "hci_version").read_text().strip()
+        return _HCI_VERSIONS.get(int(raw))
+    except (OSError, ValueError):
+        return None

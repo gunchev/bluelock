@@ -12,6 +12,7 @@ from PyQt6.QtWidgets import QApplication
 
 from bluelock.bluetooth import get_monitor
 from bluelock.config import Config
+from bluelock.rssi_history import RssiHistory, RssiSample
 from bluelock.session_locker import LockError, ScreenSaverInhibitor, SessionLocker
 from bluelock.signal_processor import SignalProcessor
 from bluelock.state_machine import ProximityState, ProximityStateMachine
@@ -35,6 +36,8 @@ class BlueLockApp:
             self._config = Config()
         self._monitor = get_monitor()
         self._monitor.rssi_method = self._config.rssi_method
+        self._rssi_history = RssiHistory()
+        self._plot_dialog = None
         self._processor = SignalProcessor(self._config.buffer_size)
         self._machine = ProximityStateMachine(
             lock_rssi_threshold=self._config.lock_rssi_threshold,
@@ -64,11 +67,13 @@ class BlueLockApp:
 
     def _wire_signals(self) -> None:
         self._monitor.rssi_updated.connect(self._on_rssi_updated)
+        self._monitor.adapter_rssi_updated.connect(self._on_adapter_rssi_updated)
         self._monitor.device_appeared.connect(self._on_device_appeared)
         self._monitor.device_disappeared.connect(self._on_device_disappeared)
         self._monitor.error_occurred.connect(self._on_monitor_error)
 
         self._tray.preferences_requested.connect(self._show_preferences)
+        self._tray.rssi_plot_requested.connect(self._show_rssi_plot)
         self._tray.pause_toggled.connect(self._set_paused)
         self._tray.quit_requested.connect(self._quit)
 
@@ -78,6 +83,10 @@ class BlueLockApp:
 
     def _on_rssi_updated(self, rssi: int) -> None:
         self._processor.add_reading(rssi)
+
+    def _on_adapter_rssi_updated(self, adapter: str, rssi: int, source: str) -> None:
+        import time
+        self._rssi_history.add(adapter, RssiSample(ts=time.monotonic(), rssi=rssi, source=source))
 
     def _on_device_appeared(self) -> None:
         self._device_present = True
@@ -148,6 +157,16 @@ class BlueLockApp:
         self._paused = paused
         log.info("Monitoring %s", "paused" if paused else "resumed")
         self._update_inhibit()
+
+    def _show_rssi_plot(self) -> None:
+        from bluelock.rssi_plot import RssiPlotDialog
+        if self._plot_dialog is not None:
+            self._plot_dialog.raise_()
+            self._plot_dialog.activateWindow()
+            return
+        self._plot_dialog = RssiPlotDialog(self._rssi_history, self._monitor)
+        self._plot_dialog.show()
+        self._plot_dialog.finished.connect(lambda _: setattr(self, "_plot_dialog", None))
 
     def _show_preferences(self) -> None:
         from bluelock.config_dialog import ConfigDialog

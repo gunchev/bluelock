@@ -18,8 +18,8 @@ class AbstractBluetoothMonitor(QObject):
     # Aggregated smoothed RSSI across all selected adapters (dBm)
     rssi_updated = pyqtSignal(int)
 
-    # Per-adapter RSSI sample (adapter_address, dBm) — for UI debugging
-    adapter_rssi_updated = pyqtSignal(str, int)
+    # Per-adapter RSSI sample (adapter_address, dBm, source) — for UI debugging
+    adapter_rssi_updated = pyqtSignal(str, int, str)
 
     # Emitted when the target device becomes visible on at least one selected adapter
     device_appeared = pyqtSignal()
